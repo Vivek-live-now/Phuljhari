@@ -37,8 +37,8 @@ void setup() {
     Serial.println(" Project Phuljhari 2.0 ✨ Pocket Diwali Festival");
     Serial.println(" Tiny sparks. Wireless smiles.");
     Serial.println(" Hardware: M5StickS3 | Orientation: Portrait (135x240)");
-    Serial.printf (" Power Profile: CPU @ %u MHz, Wi-Fi TX @ %d dBm\n",
-                   getCpuFrequencyMhz(), PHULJHARI_WIFI_TX_POWER_DBM);
+    Serial.printf (" Power Profile: CPU @ %lu MHz, Wi-Fi TX @ %d dBm\n",
+                   (unsigned long)getCpuFrequencyMhz(), PHULJHARI_WIFI_TX_POWER_DBM);
     Serial.println("========================================================");
 
     uint32_t start_ms = millis();
@@ -76,7 +76,7 @@ void loop() {
         s_last_power_save = cur_power_save;
         uint32_t target_freq = cur_power_save ? PHULJHARI_CPU_FREQ_POWER_SAVE_MHZ : PHULJHARI_CPU_FREQ_NORMAL_MHZ;
         setCpuFrequencyMhz(target_freq);
-        Serial.printf("[PWR] CPU Frequency scaled to %u MHz (power_save=%d).\n", target_freq, cur_power_save);
+        Serial.printf("[PWR] CPU Frequency scaled to %lu MHz (power_save=%d).\n", (unsigned long)target_freq, cur_power_save);
     }
 
     // 2. Synchronize radio hardware state if wireless toggled

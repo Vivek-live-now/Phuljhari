@@ -112,7 +112,7 @@ void ControllerUi::render(ControllerStateMachine& csm, uint32_t current_time_ms)
     }
 
     // Keep active during playing animations
-    if (csm.get_anim_state() == CHAR_STATE_PLAYING) {
+    if (csm.get_animation_state() == CHAR_STATE_PLAYING) {
         last_activity_time_ms_ = current_time_ms;
     }
 
