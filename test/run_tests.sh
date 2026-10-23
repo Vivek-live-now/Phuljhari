@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# Project Phuljhari ✨ Native Protocol & Safety Unit Test Runner
+# Project Phuljhari ✨ Native Protocol & Receiver State Machine Test Runner
 # ==============================================================================
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 BUILD_DIR="${REPO_ROOT}/build_test"
-TEST_BIN="${BUILD_DIR}/test_protocol"
+TEST_PROTOCOL_BIN="${BUILD_DIR}/test_protocol"
+TEST_RECEIVER_SM_BIN="${BUILD_DIR}/test_receiver_sm"
 
 echo "--------------------------------------------------------"
 echo "Building Phuljhari Native Test Suite..."
@@ -16,7 +17,6 @@ echo "--------------------------------------------------------"
 
 mkdir -p "${BUILD_DIR}"
 
-# Choose compiler (clang++ or g++)
 if command -v clang++ >/dev/null 2>&1; then
     CXX=clang++
 elif command -v g++ >/dev/null 2>&1; then
@@ -26,25 +26,31 @@ else
     exit 1
 fi
 
-echo "Compiling with ${CXX}..."
+echo "Compiling protocol tests with ${CXX}..."
 ${CXX} -std=c++17 \
     -Wall -Wextra -Werror \
     -I"${REPO_ROOT}/shared" \
     -I"${REPO_ROOT}/test" \
     "${REPO_ROOT}/test/test_protocol.cpp" \
-    -o "${TEST_BIN}"
+    -o "${TEST_PROTOCOL_BIN}"
+
+echo "Compiling receiver state machine tests with ${CXX}..."
+${CXX} -std=c++17 \
+    -Wall -Wextra -Werror \
+    -I"${REPO_ROOT}/shared" \
+    -I"${REPO_ROOT}/receiver/include" \
+    -I"${REPO_ROOT}/receiver/src" \
+    -I"${REPO_ROOT}/test" \
+    "${REPO_ROOT}/receiver/src/receiver_state_machine.cpp" \
+    "${REPO_ROOT}/test/test_receiver_sm.cpp" \
+    -o "${TEST_RECEIVER_SM_BIN}"
 
 echo "Compilation successful. Executing tests..."
 echo "--------------------------------------------------------"
-"${TEST_BIN}"
-TEST_EXIT_CODE=$?
+"${TEST_PROTOCOL_BIN}"
+"${TEST_RECEIVER_SM_BIN}"
 
 echo "--------------------------------------------------------"
-if [ ${TEST_EXIT_CODE} -eq 0 ]; then
-    echo "All unit tests PASSED successfully."
-else
-    echo "Unit tests FAILED with exit code ${TEST_EXIT_CODE}."
-fi
+echo "All native unit tests PASSED successfully."
 echo "--------------------------------------------------------"
-
-exit ${TEST_EXIT_CODE}
+exit 0
