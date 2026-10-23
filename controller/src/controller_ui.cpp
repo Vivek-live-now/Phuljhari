@@ -250,35 +250,35 @@ void ControllerUi::render_settings_screen(ControllerStateMachine& csm, uint32_t 
     };
 
     SettingItemView items[10];
-    snprintf(items[0].label, 16, "Wireless");
+    items[0].label = "Wireless";
     snprintf(items[0].value, 16, "%s", s.wireless_enabled ? "ON" : "OFF");
 
-    snprintf(items[1].label, 16, "Sound");
+    items[1].label = "Sound";
     snprintf(items[1].value, 16, "%s", s.sound_enabled ? "ON" : "OFF");
 
-    snprintf(items[2].label, 16, "Volume");
+    items[2].label = "Volume";
     snprintf(items[2].value, 16, "%d%%", s.volume_percent);
 
-    snprintf(items[3].label, 16, "Motion Tilt");
+    items[3].label = "Motion Tilt";
     snprintf(items[3].value, 16, "%s", s.tilt_enabled ? "ON" : "OFF");
 
-    snprintf(items[4].label, 16, "Flick-Start");
+    items[4].label = "Flick-Start";
     snprintf(items[4].value, 16, "%s", s.flick_enabled ? "ON" : "OFF");
 
-    snprintf(items[5].label, 16, "Flick Sens");
+    items[5].label = "Flick Sens";
     snprintf(items[5].value, 16, "%s", SENS_NAMES[s.flick_sensitivity % 3]);
 
-    snprintf(items[6].label, 16, "Power Save");
+    items[6].label = "Power Save";
     snprintf(items[6].value, 16, "%s", s.power_save_mode ? "ON" : "OFF");
 
-    snprintf(items[7].label, 16, "Theme");
+    items[7].label = "Theme";
     snprintf(items[7].value, 16, "%s", THEME_NAMES[s.background_theme % 3]);
 
-    snprintf(items[8].label, 16, "Rangoli");
+    items[8].label = "Rangoli";
     snprintf(items[8].value, 16, "%s", s.rangoli_enabled ? "ON" : "OFF");
 
-    snprintf(items[9].label, 16, "[ < BACK ]");
-    snprintf(items[9].value, 16, "");
+    items[9].label = "[ < BACK ]";
+    items[9].value[0] = '\0';
 
     // Render list of 10 items
     int start_y = 28;
