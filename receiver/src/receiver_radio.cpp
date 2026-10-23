@@ -35,11 +35,19 @@ static void espnow_recv_cb(const uint8_t *mac, const uint8_t *data, int len) {
 }
 #endif
 
+#if defined(ESP_ARDUINO_VERSION_VAL) && ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+static void espnow_send_cb(const wifi_tx_info_t * /*info*/, esp_now_send_status_t status) {
+    if (s_radio_instance != nullptr) {
+        s_radio_instance->on_data_sent(nullptr, (uint8_t)status);
+    }
+}
+#else
 static void espnow_send_cb(const uint8_t *mac_addr, esp_now_send_status_t status) {
     if (s_radio_instance != nullptr) {
         s_radio_instance->on_data_sent(mac_addr, (uint8_t)status);
     }
 }
+#endif
 
 /* -------------------------------------------------------------------------
  * ReceiverRadio Class Implementation
