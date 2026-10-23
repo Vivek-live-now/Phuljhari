@@ -828,6 +828,12 @@ public:
         has_initial_rx_ = true;
     }
 
+    void reset() {
+        last_rx_ms_ = 0;
+        last_ping_tx_ms_ = 0;
+        has_initial_rx_ = false;
+    }
+
     void record_ping_tx(uint32_t current_time_ms) {
         last_ping_tx_ms_ = current_time_ms;
     }

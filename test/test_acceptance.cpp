@@ -452,13 +452,18 @@ static bool test_acceptance_imu_tilt_subtle_visual_only() {
     ACC_ASSERT(controller.get_total_triggers() == 0,
                "Req 10: Triggers count remains 0");
 
-    // Req 11: Button-based selection still works independently
+    // Req 11: Button-based selection still works independently (8 characters in Phuljhari 2.0)
+    ACC_ASSERT(controller.get_selected_character_id() == CHAR_PHULJHARI, "Starts at Phuljhari");
     controller.cycle_character_forward();
-    ACC_ASSERT(controller.get_selected_character() == EFFECT_ID_ANAR, "Req 11: Button cycles to Anar");
+    ACC_ASSERT(controller.get_selected_character_id() == CHAR_ANAR, "Req 11: Button cycles to Anar");
     controller.cycle_character_forward();
-    ACC_ASSERT(controller.get_selected_character() == EFFECT_ID_PATAKHA, "Req 11: Button cycles to Patakha");
-    controller.cycle_character_forward();
-    ACC_ASSERT(controller.get_selected_character() == EFFECT_ID_PHULJHARI, "Req 11: Button cycles back to Phuljhari");
+    ACC_ASSERT(controller.get_selected_character_id() == CHAR_SKY_ROCKET, "Req 11: Button cycles to Sky Rocket");
+    // Cycle through remaining 6 characters to return to Phuljhari
+    for (int i = 0; i < 6; ++i) {
+        controller.cycle_character_forward();
+    }
+    ACC_ASSERT(controller.get_selected_character_id() == CHAR_PHULJHARI, "Req 11: Button cycles back to Phuljhari");
+    ACC_ASSERT(controller.get_selected_character() == EFFECT_ID_PHULJHARI, "Maps to EFFECT_ID_PHULJHARI");
 
     // Req 12: WS2812B effects and GPIO 2 remain independent
     ReceiverStateMachine receiver;

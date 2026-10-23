@@ -1,4 +1,4 @@
-# Project Phuljhari ✨
+# Project Phuljhari 2.0 ✨ (Pocket Diwali Festival)
 
 [![CI](https://github.com/Vivek-live-now/Phuljhari/actions/workflows/ci.yml/badge.svg)](https://github.com/Vivek-live-now/Phuljhari/actions/workflows/ci.yml)
 [![Protocol Version](https://img.shields.io/badge/protocol-v1.0.0-blue.svg)](file:///data/data/com.termux/files/home/phuljhari/shared/phuljhari_protocol.h)
@@ -6,40 +6,43 @@
 [![PlatformIO](https://img.shields.io/badge/PlatformIO-ESP32%20%7C%20ESP32--S3-orange.svg)](file:///data/data/com.termux/files/home/phuljhari/platformio.ini)
 
 > **Tagline:** *Tiny sparks. Wireless smiles.*  
-> A cute, polished, handheld wireless decorative light-control system pairing an **M5StickS3** controller with an **ESP32-WROOM-32D** receiver over low-latency **ESP-NOW**.
+> An interactive, portrait-oriented Diwali simulator and wireless decorative light controller for **M5StickS3** paired with an **ESP32-WROOM-32D** receiver over low-latency **ESP-NOW**.
 
 ---
 
 ## 🌟 Table of Contents
-1. [Project Overview](#-project-overview)
+1. [What's New in Phuljhari 2.0](#-whats-new-in-phuljhari-20)
 2. [Safety Boundary & Compliance](#-safety-boundary--compliance)
-3. [System Architecture](#-system-architecture)
-4. [Hardware Specifications](#-hardware-specifications)
-5. [Wiring & Power Guide](#-wiring--power-guide)
-6. [ESP-NOW Protocol Specification](#-esp-now-protocol-specification)
-7. [User Controls & Characters](#-user-controls--characters)
-8. [Build & Verification Instructions](#-build--verification-instructions)
-9. [Troubleshooting Guide](#-troubleshooting-guide)
-10. [Physical Bench-Test Checklist](#-physical-bench-test-checklist)
+3. [The 8 Festive Characters](#-the-8-festive-characters)
+4. [Controls & Gesture Interactions](#-controls--gesture-interactions)
+5. [Procedural Audio Engine](#-procedural-audio-engine)
+6. [Interactive Settings & Persistence](#-interactive-settings--persistence)
+7. [System Architecture](#-system-architecture)
+8. [Wiring & Power Guide](#-wiring--power-guide)
+9. [ESP-NOW Protocol Specification](#-esp-now-protocol-specification)
+10. [Build & Verification Instructions](#-build--verification-instructions)
+11. [Troubleshooting Guide](#-troubleshooting-guide)
+12. [Physical Bench-Test Checklist](#-physical-bench-test-checklist)
 
 ---
 
-## 🎆 Project Overview
+## 🎆 What's New in Phuljhari 2.0
 
-**Project Phuljhari** brings the festive delight of sparkling decorative lights into a safe, wireless, handheld experience. 
-
-The system pairs:
-* **M5StickS3 Handheld Controller:** A compact device featuring a vibrant 1.14" color display, 6-axis IMU for gesture and tilt detection, dual tactile buttons, and custom-animated characters.
-* **ESP32-WROOM-32D Receiver:** A responsive wireless node driving addressable RGB LEDs (WS2812B) and an independent bench indicator LED with real-time particle and light effects.
-* **ESP-NOW Protocol:** Direct peer-to-peer Wi-Fi packet transport operating without a Wi-Fi router, providing instantaneous command dispatch, application-level acknowledgements, duplicate deduplication, and failsafe link monitoring.
+**Phuljhari 2.0** transforms the handheld M5StickS3 into a pocket-sized Diwali celebration:
+* **Portrait Ergonomics (135 × 240):** Natural vertical handheld layout with thumb Button A comfortably positioned at the bottom and index Button B on the side.
+* **Expanded Roster of 8 Festive Characters:** From classic golden sparklers and fountain cones to spinning chakris, sky rockets, sparkler garlands, cute cartoon bomb mascots, candles, and traditional glowing diyas.
+* **Deliberate Flick-to-Start:** A dedicated jerk-onset G-force detector triggers celebratory cracker animations with a crisp flick of the wrist.
+* **Procedural Personality Sound Effects:** Integrated multi-step tone sequencer using `M5.Speaker` synthesizing pops, crackles, ascending whooshes, chimes, and tactile UI feedback.
+* **Dedicated Settings Screen & NVS State Persistence:** Configurable wireless toggle, sound volume, tilt/flick toggles, sensitivity presets, power-saving frame rates, background night themes, and glowing rangoli floor art.
+* **Strict Safety & GPIO 2 Exclusivity:** Preserves strict hardware isolation where receiver GPIO 2 is exclusively driven by physical button presses and hold-sync messages with failsafe auto-cutoff.
 
 ---
 
 ## 🛡️ Safety Boundary & Compliance
 
 > [!IMPORTANT]  
-> **Exclusively for Low-Voltage Decorative LED Lighting & On-Device Simulation.**  
-> Project Phuljhari is designed solely for driving harmless addressable RGB LEDs (WS2812B, SK6812) and low-voltage bench indicator LEDs (≤ 5V DC).  
+> **Exclusively for Low-Voltage Decorative LED Lighting & Harmless Screen Simulation.**  
+> Project Phuljhari is designed solely for driving addressable RGB LEDs (WS2812B, SK6812) and low-voltage bench indicator LEDs (≤ 5V DC).  
 > **Under no circumstances should this system be modified or connected to pyrotechnic igniters, electric matches (e-matches), model rocket motors, heating coils, or high-energy actuators.**
 
 ### Built-in Failsafe Architecture
@@ -47,8 +50,95 @@ The system pairs:
 2. **Watchdog Communication Auto-Cutoff:** If the receiver does not receive valid commands or keepalive heartbeats within **20 seconds** (`PHULJHARI_WATCHDOG_TIMEOUT_MS`), all LED outputs are automatically extinguished and the receiver reverts to `SAFE_IDLE`.
 3. **Hard Clamped Duration Limits:** Any incoming effect duration exceeding **15 seconds** is clamped to safe limits (`PHULJHARI_MAX_DURATION_MS`), with an absolute default of **5 seconds**.
 4. **Brightness & Thermal Protection:** Firmware enforces an intensity ceiling of `180 / 255` (~70% maximum) in [`receiver_config.h`](file:///data/data/com.termux/files/home/phuljhari/receiver/include/receiver_config.h) to eliminate USB port overcurrent brownouts and excessive thermal dissipation.
-5. **Immediate Emergency Stop:** An explicit `MSG_TYPE_EFFECT_STOP` command instantly blanks the LED strip and returns the receiver to a safe idle state.
+5. **Strict Button-Controlled GPIO 2:** Receiver GPIO 2 responds exclusively to valid `BUTTON_DOWN`, `BUTTON_SYNC`, and `BUTTON_UP` packets. Zero coupling to heartbeat pings, effect commands, or idle animations.
 6. **Lost Button-Hold Cutoff:** A 600 ms receiver timeout automatically deactivates the live hold indicator if wireless communication drops while the button is physically held.
+
+---
+
+## 🎭 The 8 Festive Characters
+
+Each character features large portrait artwork, personality facial expressions, idle breathing animations, celebratory playing fireworks, and procedural sound effects:
+
+| Character | Name | Theme | Wireless Effect | Audio Personality |
+| :---: | :--- | :--- | :---: | :--- |
+| **0** | **✨ Phuljhari** | Golden Sparkler | `EFFECT_ID_PHULJHARI` | Sparkling golden shimmer & bright sparkles |
+| **1** | **🎆 Anar** | Festive Fountain | `EFFECT_ID_ANAR` | Ascending fountain crescendo with gravity splash |
+| **2** | **🚀 Sky Rocket** | Sky Rocket | `EFFECT_ID_PATAKHA` | Rising whoosh followed by aerial bloom pop |
+| **3** | **🎋 Garland** | Sparkler Garland | `EFFECT_ID_PATAKHA` | Rapid rhythmic cheerful pops & twinkling sparks |
+| **4** | **💣 Patakha Bomb** | Cute Mascot Bomb | `EFFECT_ID_PATAKHA` | Mascot drop whistle followed by friendly comic pop |
+| **5** | **🌀 Chakri** | Ground Wheel | `EFFECT_ID_ANAR` | Whirling airy hum with expanding circular sparks |
+| **6** | **🕯️ Candle** | Luminous Candle | `EFFECT_ID_PHULJHARI` | Peaceful warm harmonic chimes with gentle flame flutter |
+| **7** | **🪔 Diya** | Traditional Oil Lamp | `EFFECT_ID_PHULJHARI` | Serene festive chimes with warm golden glow |
+
+---
+
+## 🎮 Controls & Gesture Interactions
+
+### Device Orientation & Ergonomics
+The M5StickS3 display runs in **Portrait Mode (135 × 240, rotation 0)**:
+```
+           +-------------------------+
+           | [● LINK] [SFX] [BAT 95%]|  <-- Top Telemetry Bar
+           |                         |
+           |         \  |  /         |
+           |       -- (^_^) --       |  <-- Large Animated Cracker
+           |         /  |  \         |
+           |        [ Phuljhari ]    |
+           |                         |
+           |    ░░░░░░░░░░░░░░░░░    |  <-- Glowing Rangoli Layer
+           +-------------------------+
+             [ Btn A: Tap/Hold/Edit ]   [ Btn B: Cycle / Settings ]
+```
+
+### 1. Deliberate Flick-to-Start Gesture
+* **Deliberate Flick Detection:** A sudden wrist flick exceeding threshold (MED: `1.35 G`, LOW: `1.65 G`, HIGH: `1.10 G`) with a dynamic onset jerk (`Δa ≥ 0.25 G`) ignites the selected cracker into its celebratory playing animation.
+* **Cooldown Protection:** A 700 ms cooldown prevents accidental double-triggers from single hand motions.
+* **Tilt Separation:** Static tilt generates approximately `1.0 G` total gravity with `Δa ≈ 0`, strictly preventing false flick triggers during tilting.
+
+### 2. Physical Button Controls
+* **Front Thumb Button (Btn A):**
+  * **Short Tap (< 300 ms):** Alternative ignition control. Starts the cracker celebration and sends an ESP-NOW command if wireless is enabled.
+  * **Press and Hold:** Engages live button synchronization. Transmits `BUTTON_DOWN`, periodic 180 ms `BUTTON_SYNC`, and `BUTTON_UP`, holding receiver GPIO 2 ON while pressed.
+  * **In Settings Mode:** Toggles or cycles the currently selected setting row.
+* **Side Button (Btn B):**
+  * **Short Click:** Exclusively cycles forward through all 8 festive characters (`Phuljhari` &rarr; `Anar` &rarr; `Sky Rocket` &rarr; `Garland` &rarr; `Patakha Bomb` &rarr; `Chakri` &rarr; `Candle` &rarr; `Diya`).
+  * **Long Press (> 600 ms):** Enters or exits the Settings Screen without resetting festival state.
+
+### 3. Subtle Visual Tilt (BMI270 IMU)
+* Tilting the controller gently left or right tilts the character sprite and curves particle trajectories in real time (clamped to ±0.30 radians).
+* Returning the device upright smoothly returns the character to vertical neutral (0 rad).
+* **Strict Boundary:** Tilt alters visual rotation only; it **never** cycles characters or sends radio commands.
+
+---
+
+## 🔊 Procedural Audio Engine
+
+Phuljhari 2.0 features an embedded non-blocking procedural tone sequencer running on `M5.Speaker`:
+* **Zero External Audio Files:** Synthesizes cheerful tones procedurally with frequency sequences and microsecond pacing.
+* **Configurable Volume:** Scaled from 0% to 100% in 25% increments via Settings.
+* **Silent Mode:** At volume 0% or when sound is toggled OFF, `M5.Speaker.stop()` ensures complete hardware silence.
+* **Tactile Feedback:** Crisp 1400 Hz 30 ms chirp on button clicks and setting toggles.
+
+---
+
+## ⚙️ Interactive Settings & Persistence
+
+Hold **Button B (> 600 ms)** to open the 10-row portrait Settings Screen. Use **Button B** (click) to navigate rows and **Button A** (tap) to toggle values:
+
+| Row | Option | Range / States | Description |
+| :---: | :--- | :--- | :--- |
+| **0** | **Wireless** | `ON` / `OFF` | Enables or suspends ESP-NOW radio dispatch. Offline mode allows full standalone visual simulation. |
+| **1** | **Sound** | `ON` / `OFF` | Toggles speaker audio output. |
+| **2** | **Volume** | `0%` to `100%` (25% steps) | Sets master audio volume. |
+| **3** | **Tilt** | `ON` / `OFF` | Enables/disables IMU visual tilt responsiveness. |
+| **4** | **Flick** | `ON` / `OFF` | Enables/disables flick-to-start gesture trigger. |
+| **5** | **Flick Sens** | `LOW` (1.65G) / `MED` (1.35G) / `HIGH` (1.10G) | Configures jerk threshold sensitivity. |
+| **6** | **Power Save** | `ON` (18 FPS) / `OFF` (35 FPS) | Switches display refresh rate to conserve battery. |
+| **7** | **Theme** | `Rooftop` / `Courtyard` / `Bazaar` | Selects ambient background night sky and festive lanterns. |
+| **8** | **Rangoli** | `ON` / `OFF` | Toggles glowing decorative rangoli floor art. |
+| **9** | **[ BACK ]** | Return | Exits settings screen back to festival. |
+
+*All settings are automatically saved to ESP32 Non-Volatile Storage (NVS via `Preferences`) and persist across power cycles.*
 
 ---
 
@@ -56,17 +146,20 @@ The system pairs:
 
 ```mermaid
 flowchart TD
-    subgraph Controller ["M5StickS3 Controller"]
-        UI["Dual-Buffered M5Canvas UI<br/>(35 FPS Display Engine)"]
-        IMU["BMI270 6-Axis IMU<br/>(EMA Filtered Subtle Visual Tilt)"]
-        BTN["Physical Buttons<br/>(BtnA Spark/Hold, BtnB Cycle Cracker)"]
-        CSM["Controller State Machine<br/>(Retries, ACK matching, Health)"]
-        CRADIO["Controller Radio Dispatcher<br/>(ESP-NOW Broadcast / Unicast)"]
+    subgraph Controller ["M5StickS3 Controller (Portrait 135x240)"]
+        UI["Dual-Buffered M5Canvas UI<br/>(8 Characters, 3 Themes, Rangoli)"]
+        IMU["BMI270 IMU Engine<br/>(Subtle Visual Tilt & Jerk-Onset Flick)"]
+        SND["Procedural Sound Manager<br/>(M5.Speaker Tone Sequencer)"]
+        BTN["Physical Buttons<br/>(BtnA Ignition/Hold/Edit, BtnB Cycle/Settings)"]
+        SET["Settings Manager<br/>(NVS Preferences Persistence)"]
+        CSM["Controller State Machine<br/>(Animation Lifecycle, Health Tracking)"]
+        CRADIO["Controller Radio Dispatcher<br/>(ESP-NOW Transport)"]
         
         BTN --> CSM
         IMU --> CSM
-        IMU -. Subtle Tilt & Sparkles .-> UI
+        SET --> CSM
         CSM --> UI
+        CSM --> SND
         CSM --> CRADIO
     end
 
@@ -77,9 +170,9 @@ flowchart TD
 
     subgraph Receiver ["ESP32-WROOM-32D Receiver"]
         RRADIO["Receiver ESP-NOW ISR<br/>(Bounded Queue, Dual API 2.x/3.x)"]
-        RSM["Receiver State Machine<br/>(32-Window Dedup, Failsafe Watchdog)"]
-        LED["FastLED Particle Engine<br/>(Phuljhari, Anar, Patakha)"]
-        BENCH["Independent Hold Indicator<br/>(GPIO 2 Status LED)"]
+        RSM["Receiver State Machine<br/>(32-Window Dedup, 20s Watchdog)"]
+        LED["FastLED Particle Engine<br/>(Phuljhari, Anar, Patakha Strip Effects)"]
+        BENCH["Strict Button Hold Indicator<br/>(GPIO 2 Dedicated LED)"]
         
         RRADIO --> RSM
         RSM --> LED
@@ -87,42 +180,11 @@ flowchart TD
     end
 ```
 
-### Receiver State Machine
-
-```mermaid
-stateDiagram-v2
-    [*] --> SAFE_IDLE: Boot & Initialize GPIOs LOW
-    
-    SAFE_IDLE --> EFFECT_ACTIVE: Valid EFFECT_CMD Received
-    SAFE_IDLE --> SAFE_IDLE: BUTTON_DOWN / SYNC (Active Hold)
-    
-    EFFECT_ACTIVE --> COOLDOWN: Duration Expires or Watchdog (20s)
-    EFFECT_ACTIVE --> SAFE_IDLE: Emergency EFFECT_STOP Received
-    
-    COOLDOWN --> SAFE_IDLE: Cooldown Timer Complete (50 ms)
-```
-
----
-
-## 🧰 Hardware Specifications
-
-| Subsystem | Component | Specifications & Role |
-| :--- | :--- | :--- |
-| **Controller MCU** | **M5StickS3** | ESP32-S3-PICO-1-N8R8 (Dual-core Xtensa LX7 @ 240 MHz, 8 MB Flash, 8 MB PSRAM) |
-| **Controller Display** | Built-in ST7789P3 | 1.14" IPS LCD, 240x135 landscape resolution, 16-bit color, double-buffered |
-| **Controller Sensors** | Built-in BMI270 | 6-axis IMU (3-axis Accel + 3-axis Gyro) for tilt and flick detection |
-| **Controller Power** | AXP2101 PMIC | 120 mAh internal LiPo battery with USB-C charging and battery voltage telemetry |
-| **Receiver MCU** | **ESP32-WROOM-32D** | Dual-core Xtensa 32-bit LX6 @ 240 MHz, 4 MB Flash, 2.4 GHz Wi-Fi antenna |
-| **Addressable LEDs** | **WS2812B / SK6812** | 5V Digital RGB LED strip (configurable 30–60 pixels) driven via GPIO 18 |
-| **Bench Status LED** | Onboard LED | Built-in test LED on GPIO 2 (active HIGH, failsafe indication) |
-
 ---
 
 ## 🔌 Wiring & Power Guide
 
 Detailed wiring specifications and electrical schematics are documented in [`WIRING_RECEIVER.md`](file:///data/data/com.termux/files/home/phuljhari/WIRING_RECEIVER.md).
-
-### Receiver Connection Diagram
 
 ```
 +-------------------------------------------------------------------+
@@ -142,104 +204,29 @@ Detailed wiring specifications and electrical schematics are documented in [`WIR
        +---[ 1000 µF 6.3V Capacitor ]---+
 ```
 
-### Pin Allocation Table
-
-| ESP32 Pin | Connection | Function | Safety / Hardware Notes |
-| :--- | :--- | :--- | :--- |
-| **VIN / 5V** | Strip `+5V` (Red) | 5V DC Power | USB 5V or external regulated 5V DC power supply |
-| **GND** | Strip `GND` (White/Black) | Common Ground | Must be tied together with external supply ground |
-| **GPIO 18** | Strip `DIN` (Green) | FastLED Data Signal | Dedicated SPI/RMT pin with 330Ω inline resistor |
-| **GPIO 2** | Onboard LED | Hold Status Indicator | Boot strapping pin (`MTDO`). Output only after boot! |
-
-### Power Budget & Supply Guidelines
-
-> [!WARNING]  
-> **Respecting the USB Current Limit:**  
-> * A WS2812B pixel draws up to **60 mA** at 100% full white.  
-> * 30 pixels at full white draw **1.8 A (9 Watts)**; 60 pixels draw **3.6 A (18 Watts)**.  
-> * Phuljhari firmware enforces a software brightness cap of `180 / 255` (~70%), limiting 30 pixels to **1.26 A** peak.  
-> * Our optimized visual animations (*Phuljhari* golden shimmer, *Anar* fountain sparks, *Patakha* burst) maintain sparse pixel activation with an average draw of **250 mA – 450 mA**, allowing safe bench testing over standard USB 2.0 / USB 3.0 ports.  
-> * **For strip installations exceeding 30 LEDs, always use an external 5V 2A–3A DC regulated power supply.**
-
 ---
 
 ## 📡 ESP-NOW Protocol Specification
 
-The Phuljhari wireless protocol is defined in [`shared/phuljhari_protocol.h`](file:///data/data/com.termux/files/home/phuljhari/shared/phuljhari_protocol.h). It uses portable, explicit big-endian serialization and rejection of malformed frames.
+The protocol uses explicit, big-endian packed binary frames with CRC8 error detection:
 
-### Binary Frame Layout (8 to 24 Bytes)
-
-```
- 0                   1                   2                   3
- 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|  Magic (0xA5) |  Version(0x01)|           Sequence            |
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|   Msg Type    |  Payload Len  |    Payload Data ...           |
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|   ...         |  CRC8-CCITT   |
-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-```
-
-### Supported Message Types
-
-| Message ID | Identifier | Direction | Purpose |
-| :--- | :--- | :--- | :--- |
-| `0x01` | [`MSG_TYPE_PING`](file:///data/data/com.termux/files/home/phuljhari/shared/phuljhari_protocol.h#L52) | Controller &rarr; Receiver | Link vitality check (2,500 ms heartbeat) |
-| `0x02` | [`MSG_TYPE_PONG`](file:///data/data/com.termux/files/home/phuljhari/shared/phuljhari_protocol.h#L53) | Receiver &rarr; Controller | Heartbeat response with receiver state code |
-| `0x03` | [`MSG_TYPE_EFFECT_CMD`](file:///data/data/com.termux/files/home/phuljhari/shared/phuljhari_protocol.h#L54) | Controller &rarr; Receiver | Effect activation (`effect_id`, `duration_ms`, `intensity`) |
-| `0x04` | [`MSG_TYPE_EFFECT_ACK`](file:///data/data/com.termux/files/home/phuljhari/shared/phuljhari_protocol.h#L55) | Receiver &rarr; Controller | Application acknowledgement confirming command receipt |
-| `0x05` | [`MSG_TYPE_EFFECT_STOP`](file:///data/data/com.termux/files/home/phuljhari/shared/phuljhari_protocol.h#L56) | Controller &rarr; Receiver | Immediate effect termination and LED blackout |
-| `0x06` | [`MSG_TYPE_STATUS_REQ`](file:///data/data/com.termux/files/home/phuljhari/shared/phuljhari_protocol.h#L57) | Controller &rarr; Receiver | Telemetry query |
-| `0x07` | [`MSG_TYPE_STATUS_RESP`](file:///data/data/com.termux/files/home/phuljhari/shared/phuljhari_protocol.h#L58) | Receiver &rarr; Controller | Uptime, execution counter, and temperature telemetry |
-| `0x08` | [`MSG_TYPE_BUTTON_DOWN`](file:///data/data/com.termux/files/home/phuljhari/shared/phuljhari_protocol.h#L59) | Controller &rarr; Receiver | Initial press-and-hold trigger for receiver status LED |
-| `0x09` | [`MSG_TYPE_BUTTON_UP`](file:///data/data/com.termux/files/home/phuljhari/shared/phuljhari_protocol.h#L60) | Controller &rarr; Receiver | Release event returning indicator to idle |
-| `0x0A` | [`MSG_TYPE_BUTTON_SYNC`](file:///data/data/com.termux/files/home/phuljhari/shared/phuljhari_protocol.h#L61) | Controller &rarr; Receiver | 180 ms periodic keepalive refreshing active hold |
-
-### Reliable Press-and-Hold State Synchronization
-* **Sequence-Ordered Sessions:** Hold state changes require strictly ascending sequence numbers.
-* **Orphan / Stale Sync Protection:** A delayed or retransmitted `BUTTON_SYNC` packet cannot revive an expired or released hold session.
-* **600 ms Auto-Cutoff Failsafe:** If radio communication drops while the button is pressed, the receiver automatically deactivates the indicator after 600 ms.
-
----
-
-## 🎭 User Controls & Characters
-
-### Animated Characters & Effects
-
-| Character | Theme | Visual Display Animation | WS2812B Decorative Effect |
-| :--- | :--- | :--- | :--- |
-| **✨ Phuljhari** | Golden Sparkler | Sparkling golden starbursts with twinkling particle trails | Warm golden sparks drifting outward with slow amber shimmer |
-| **🎆 Anar** | Festive Fountain | Colorful fountain stream ascending upwards with gravity | Multi-hue ascending particle stream with randomized splash physics |
-| **💥 Patakha** | Cartoon Burst | Playful comic character bouncing with shockwave rings | Vibrant expanding shockwaves bursting from center to edges |
-
-### M5StickS3 Interaction
-
-```
-       +------------------------------------+
-       |  [● REC: OK]         [EVT: 042]    |
-       |                                    |
-       |             ( * ^ ‿ ^ * )          |
-       |               Phuljhari            |
-       |                                    |
-       |  [BAT: 92%]             [ACK OK]   |
-       +------------------------------------+
-           [ Btn A: Spark / Hold ]    [ Btn B ]
-```
-
-* **Front Button (Btn A):**
-  * **Short Tap (< 300 ms):** Transmits an `EFFECT_CMD` for the currently selected character with bounded retries.
-  * **Long Press & Hold:** Engages live button synchronization, keeping the receiver's dedicated status LED (GPIO 2) continuously ON while held, and turning OFF immediately on release or 600 ms failsafe timeout.
-* **Side Button (Btn B):** Exclusively cycles the selected cracker character and decorative effect (*Phuljhari* &rarr; *Anar* &rarr; *Patakha*).
-* **IMU Subtle Tilt (BMI270):** Slightly tilting the M5StickS3 smoothly tilts the selected cracker and naturally curves sparkle and fountain particle trajectories. Returning the device to a level position smoothly restores neutral vertical orientation. Tilting does **NOT** cycle characters or send radio commands.
-* **IMU Virtual Flick (> 1.35 G):** Triggers an on-screen particle simulator burst without changing cracker selection or transmitting effect commands.
+| Message Type | Hex Code | Direction | Purpose |
+| :--- | :---: | :---: | :--- |
+| `MSG_TYPE_PING` | `0x01` | Controller &rarr; Receiver | Periodic heartbeat keepalive (2000 ms) |
+| `MSG_TYPE_PONG` | `0x02` | Receiver &rarr; Controller | Heartbeat response confirming link vitality |
+| `MSG_TYPE_EFFECT_CMD` | `0x03` | Controller &rarr; Receiver | Effect activation (`effect_id`, `duration_ms`, `intensity`) |
+| `MSG_TYPE_EFFECT_ACK` | `0x04` | Receiver &rarr; Controller | Application acknowledgement confirming command receipt |
+| `MSG_TYPE_EFFECT_STOP` | `0x05` | Controller &rarr; Receiver | Immediate effect termination and LED blackout |
+| `MSG_TYPE_BUTTON_DOWN` | `0x08` | Controller &rarr; Receiver | Initial press-and-hold trigger for receiver GPIO 2 LED |
+| `MSG_TYPE_BUTTON_UP` | `0x09` | Controller &rarr; Receiver | Release event switching GPIO 2 OFF immediately |
+| `MSG_TYPE_BUTTON_SYNC` | `0x0A` | Controller &rarr; Receiver | 180 ms periodic keepalive refreshing active hold |
 
 ---
 
 ## 🛠️ Build & Verification Instructions
 
 ### 1. Host Native Test Suite (Host Clang/GCC)
-The shared protocol, safety policies, receiver state machine, controller logic, and acceptance tests compile and run natively on any Linux, macOS, or Termux environment without hardware:
+The complete protocol, safety logic, receiver state machine, controller logic, sound sequencer, flick detector, and acceptance suites compile natively without embedded hardware:
 
 ```bash
 # Clone the repository
@@ -252,9 +239,9 @@ cd Phuljhari
 
 **Test Suites Executed:**
 1. [`test/test_protocol.cpp`](file:///data/data/com.termux/files/home/phuljhari/test/test_protocol.cpp): CRC8 verification, big-endian byte roundtrips, truncated frames, sequence wraparound, safety duration & intensity clamping.
-2. [`test/test_receiver_sm.cpp`](file:///data/data/com.termux/files/home/phuljhari/test/test_receiver_sm.cpp): Non-blocking lifecycle, 32-packet duplicate filtering, 20s watchdog cutoff, idempotent ACK caching.
-3. [`test/test_controller_sm.cpp`](file:///data/data/com.termux/files/home/phuljhari/test/test_controller_sm.cpp): Character cycling, live button sync engine, bounded 3-retry backoff, matching application ACK confirmation.
-4. [`test/test_acceptance.cpp`](file:///data/data/com.termux/files/home/phuljhari/test/test_acceptance.cpp): Protocol version mismatch rejection, receiver reboot recovery, watchdog cutoff, stale sync rejection, rapid press debounce, 600 ms lost release recovery, independent status LED and strip separation.
+2. [`test/test_receiver_sm.cpp`](file:///data/data/com.termux/files/home/phuljhari/test/test_receiver_sm.cpp): Non-blocking lifecycle, 32-packet duplicate filtering, 20s watchdog cutoff, strict GPIO 2 exclusivity.
+3. [`test/test_controller_sm.cpp`](file:///data/data/com.termux/files/home/phuljhari/test/test_controller_sm.cpp): 8-character cycling, animation lifecycle, flick jerk detection, sound sequencer, settings navigation, wireless toggle, and live button sync.
+4. [`test/test_acceptance.cpp`](file:///data/data/com.termux/files/home/phuljhari/test/test_acceptance.cpp): Version mismatch rejection, receiver reboot recovery, watchdog cutoff, stale sync rejection, rapid press debounce, 600 ms lost release recovery, independent LED paths, and IMU decoupling.
 
 ---
 
@@ -282,19 +269,19 @@ pio run -e controller_m5sticks3 -t upload
 
 | Issue | Probable Cause | Corrective Action |
 | :--- | :--- | :--- |
-| **Link indicator remains RED / RECON** | Wi-Fi channel mismatch or out of range | Confirm both devices are configured to Channel 1 in [`controller_config.h`](file:///data/data/com.termux/files/home/phuljhari/controller/include/controller_config.h) and [`receiver_config.h`](file:///data/data/com.termux/files/home/phuljhari/receiver/include/receiver_config.h). Check broadcast peer configuration. |
-| **LED strip shows flickering or wrong colors** | Missing common ground or floating data line | Connect ESP32 `GND` directly to the LED strip `GND`. Add a `330Ω` inline resistor on `GPIO 18` and verify connection to `DIN` (not `DOUT`). |
-| **ESP32 Receiver fails to boot or loops in ROM bootloader** | GPIO 2 pulled HIGH externally at boot | GPIO 2 is the `MTDO` strapping pin. Remove any external pull-ups on GPIO 2. The onboard LED is safe as it is wired as an output. |
-| **M5StickS3 display stays blank or distorted** | Display configuration mismatch | Ensure `M5Unified` and `M5GFX` are loaded and display rotation is set to 1 (landscape). |
-| **Receiver reboots when effect triggers** | Power supply voltage dip / brownout | 30+ LEDs drawing power from USB can cause voltage sag. Connect an external 5V 2A power supply or reduce `PHULJHARI_CONFIG_MAX_INTENSITY`. |
+| **Link indicator shows RED / OFFLINE** | Wireless disabled in settings or channel mismatch | Open Settings (hold Btn B >600ms) and ensure Wireless is ON. Confirm both devices are configured to Channel 1 in [`controller_config.h`](file:///data/data/com.termux/files/home/phuljhari/controller/include/controller_config.h). |
+| **Flick gesture does not trigger cracker** | Flick disabled or sensitivity too low | Open Settings and verify Flick is ON. Set Flick Sensitivity to HIGH for gentle gestures. |
+| **No sound playing** | Volume is 0% or Sound disabled | Check telemetry bar for speaker icon. Open Settings, set Sound to ON, and increase Volume (25%–100%). |
+| **LED strip shows flickering or wrong colors** | Missing common ground or floating data line | Connect ESP32 `GND` directly to the LED strip `GND`. Add a `330Ω` inline resistor on `GPIO 18`. |
+| **ESP32 Receiver fails to boot** | GPIO 2 pulled HIGH externally at boot | GPIO 2 is the `MTDO` strapping pin. Remove any external pull-ups on GPIO 2. |
 
 ---
 
 ## 📋 Physical Bench-Test Checklist
 
-Before deploying the hardware into a decorative enclosure, perform this bench-test checklist:
+Before deploying the hardware into a decorative enclosure, perform this physical bench-test checklist:
 
-- [ ] **Step 1: Visual Inspection**
+- [ ] **Step 1: Visual Inspection & Wiring Safety**
   - [ ] Verify 330Ω resistor is installed on GPIO 18 data line.
   - [ ] Verify 1000 µF capacitor is connected across 5V and GND near strip input.
   - [ ] Confirm no external pull-ups exist on GPIO 2.
@@ -303,15 +290,15 @@ Before deploying the hardware into a decorative enclosure, perform this bench-te
   - [ ] Observe onboard LED: stays strictly OFF at boot and during idle (no automatic blinking or heartbeat).
 - [ ] **Step 3: Controller Standalone Verification**
   - [ ] Flash `controller_m5sticks3`.
-  - [ ] Verify startup splash animation loads cleanly.
-  - [ ] Test Btn B character cycling: verifies Phuljhari, Anar, Patakha animations cycle reliably.
-  - [ ] Test IMU subtle visual tilt: tilt left/right slightly and observe cracker tilting smoothly and sparkles curving in the tilt direction.
-  - [ ] Return device to level: verify cracker smoothly returns to neutral vertical orientation without changing selection.
-  - [ ] Test IMU flick gesture: verify on-screen particle burst activates without changing cracker selection or transmitting radio commands.
+  - [ ] Verify portrait startup splash animation loads cleanly (135 × 240).
+  - [ ] Test Btn B character cycling: verifies all 8 characters cycle smoothly with distinct artwork and idle poses.
+  - [ ] Test flick gesture: perform a deliberate wrist flick; observe cracker igniting into its celebratory playing animation and personality sound playing.
+  - [ ] Test IMU subtle visual tilt: tilt left/right slightly and observe cracker tilting smoothly (±0.30 rad) without cycling characters or transmitting effect commands.
+  - [ ] Test Settings navigation: hold Btn B >600ms to open Settings; toggle Wireless, Sound, Volume, and Themes; verify state persists across reboots.
 - [ ] **Step 4: End-to-End Wireless Pair Verification**
-  - [ ] Power both devices within 1 meter.
-  - [ ] Observe controller link indicator: transitions from `RECON` to green `REC: OK`.
-  - [ ] Tap **Btn A**: confirm controller displays `ACK OK` toast and receiver onboard LED remains OFF (only strip effect runs).
+  - [ ] Power both devices within range.
+  - [ ] Observe controller link indicator: transitions from `OFFLINE`/`RECON` to green `REC: OK`.
+  - [ ] Tap **Btn A** or perform flick: confirm controller displays `ACK OK` toast and receiver onboard LED remains OFF (only strip effect runs).
   - [ ] Press and hold **Btn A**: confirm receiver onboard LED (GPIO 2) stays solidly ON for duration of hold and turns OFF immediately upon release.
   - [ ] Hold Btn A and power off controller: verify receiver onboard LED auto-cuts off within 600 ms.
 - [ ] **Step 5: Full LED Strip Test (With External Power)**

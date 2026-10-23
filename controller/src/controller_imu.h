@@ -1,6 +1,6 @@
 /**
  * @file controller_imu.h
- * @brief 6-Axis IMU (BMI270) driver, EMA filtering, and gesture engine for M5StickS3 Controller ✨
+ * @brief 6-Axis IMU (BMI270) driver, EMA filtering, and flick detection for Phuljhari 2.0 ✨
  */
 
 #ifndef PHULJHARI_CONTROLLER_IMU_H
@@ -8,10 +8,14 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+
+#if defined(ARDUINO)
 #include <M5Unified.h>
+#endif
 
 #include "controller_config.h"
 #include "controller_imu_math.h"
+#include "controller_flick_detector.h"
 #include "controller_state_machine.h"
 
 namespace phuljhari {
@@ -29,8 +33,8 @@ public:
 
     /**
      * @brief Reads accelerometer, applies EMA filtering, dead-zones, and clamped rotation,
-     *        and updates the visual tilt state in CSM.
-     *        Does NOT select crackers. Does NOT send effect commands.
+     *        and detects deliberate flick-to-start gestures.
+     *        Does NOT select crackers.
      * @param csm Reference to controller state machine.
      * @param current_time_ms Current timestamp.
      */
@@ -42,6 +46,8 @@ public:
     float get_tilt_norm() const { return filtered_tilt_norm_; }
     float get_tilt_angle_rad() const { return tilt_angle_rad_; }
     bool is_available() const { return imu_available_; }
+
+    FlickDetector& get_flick_detector() { return flick_detector_; }
 
 private:
     bool imu_available_;
@@ -55,7 +61,8 @@ private:
     float filtered_tilt_norm_;
     float tilt_angle_rad_;
 
-    uint32_t last_flick_telemetry_ms_;
+    /* Dedicated flick detector */
+    FlickDetector flick_detector_;
 };
 
 } // namespace controller

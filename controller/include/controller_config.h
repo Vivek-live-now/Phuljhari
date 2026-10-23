@@ -17,17 +17,19 @@
 #include <stdbool.h>
 
 /* -------------------------------------------------------------------------
- * Display & Rendering Configuration
+ * Display & Rendering Configuration (Portrait 135 x 240)
  * ------------------------------------------------------------------------- */
-/** Display width in landscape orientation. */
-#define PHULJHARI_DISP_WIDTH             240
-/** Display height in landscape orientation. */
-#define PHULJHARI_DISP_HEIGHT            135
-/** Display rotation: 1 = Landscape with Front Button A on right. */
-#define PHULJHARI_DISP_ROTATION          1
+/** Display width in portrait orientation. */
+#define PHULJHARI_DISP_WIDTH             135
+/** Display height in portrait orientation. */
+#define PHULJHARI_DISP_HEIGHT            240
+/** Display rotation: 0 = Portrait with Front Button A at bottom. */
+#define PHULJHARI_DISP_ROTATION          0
 
-/** UI Target Frame Rate (35 FPS -> ~28 ms per frame). */
+/** Normal UI Target Frame Rate (35 FPS -> ~28 ms per frame). */
 #define PHULJHARI_UI_FRAME_INTERVAL_MS   28
+/** Power-Saving UI Frame Rate (18 FPS -> ~55 ms per frame). */
+#define PHULJHARI_UI_POWER_SAVE_INTERVAL_MS 55
 
 /* -------------------------------------------------------------------------
  * Wireless & Radio Settings (ESP-NOW)
@@ -74,10 +76,18 @@
 /** Maximum visual rotation angle in radians (~20 degrees = 0.35 rad). */
 #define PHULJHARI_IMU_MAX_ROTATION_RAD   0.35f
 
-/** Shake / flick threshold for virtual simulator telemetry (G-force). */
-#define PHULJHARI_IMU_FLICK_THRESHOLD_G  1.35f
+/** Flick sensitivity presets (G-force threshold). */
+#define PHULJHARI_FLICK_SENS_LOW_G       1.65f
+#define PHULJHARI_FLICK_SENS_MED_G       1.35f
+#define PHULJHARI_FLICK_SENS_HIGH_G      1.10f
 
-/** Minimum cooldown between virtual flick bursts (milliseconds). */
-#define PHULJHARI_IMU_GESTURE_COOLDOWN_MS 600
+/** Minimum cooldown between deliberate animation start flicks (milliseconds). */
+#define PHULJHARI_FLICK_COOLDOWN_MS      700
+
+/** Cooldown duration after animation finishes before allowing restart (milliseconds). */
+#define PHULJHARI_ANIM_COOLDOWN_MS       500
+
+/** Long press duration for Button B to enter Settings (milliseconds). */
+#define PHULJHARI_BTN_B_SETTINGS_HOLD_MS 600
 
 #endif /* PHULJHARI_CONTROLLER_CONFIG_H */

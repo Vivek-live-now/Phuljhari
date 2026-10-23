@@ -1,8 +1,8 @@
 /**
  * @file main.cpp
- * @brief Firmware entrypoint for Project Phuljhari M5StickS3 Controller ✨
+ * @brief Firmware entrypoint for Phuljhari 2.0 M5StickS3 Portrait Controller ✨
  * 
- * Hardware: M5StickS3 (ESP32-S3-PICO-1-N8R8, ST7789P3 135x240, BMI270 IMU)
+ * Hardware: M5StickS3 (ESP32-S3-PICO-1-N8R8, ST7789P3 135x240 Portrait, BMI270 IMU)
  * Tagline:  Tiny sparks. Wireless smiles.
  */
 
@@ -31,60 +31,80 @@ void setup() {
     delay(100);
 
     Serial.println("\n========================================================");
-    Serial.println(" Project Phuljhari ✨ M5StickS3 Controller Firmware");
+    Serial.println(" Project Phuljhari 2.0 ✨ Pocket Diwali Festival");
     Serial.println(" Tiny sparks. Wireless smiles.");
-    Serial.println(" Hardware: M5StickS3 | Framework: M5Unified");
+    Serial.println(" Hardware: M5StickS3 | Orientation: Portrait (135x240)");
     Serial.println("========================================================");
 
     uint32_t start_ms = millis();
 
-    // 1. Initialize Display & Double-Buffered Canvas
+    // 1. Initialize Display & Double-Buffered Portrait Canvas (135x240)
     s_ui.begin();
 
-    // 2. Play celebratory startup animation
+    // 2. Play festive startup splash animation
     s_ui.show_startup_animation(2000);
 
-    // 3. Initialize Controller State Machine
+    // 3. Initialize Controller State Machine (Settings, Sound, Characters)
     s_csm.init(millis());
 
-    // 4. Initialize ESP-NOW Radio
+    // 4. Initialize ESP-NOW Radio (Broadcast / Peer)
     s_radio.begin();
 
-    // 5. Initialize BMI270 6-Axis IMU
+    // 5. Initialize BMI270 6-Axis IMU (Subtle tilt & Flick detector)
     s_imu.begin();
 
-    Serial.printf("[SYSTEM] Controller boot completed in %lu ms.\n", millis() - start_ms);
+    Serial.printf("[SYSTEM] Phuljhari 2.0 boot completed in %lu ms.\n", millis() - start_ms);
 }
 
 void loop() {
     uint32_t now = millis();
 
-    // 1. Update M5 hardware states (buttons, power, display)
+    // 1. Update M5 hardware states (buttons, battery, display)
     M5.update();
 
-    // 2. Physical Button B: Cycle character theme
-    if (M5.BtnB.wasClicked()) {
-        s_csm.cycle_character_forward();
+    // 2. Physical Button B (Side Button):
+    // - In Festival Stage: Click = Cycle Character, Hold (> 600ms) = Enter Settings
+    // - In Settings Screen: Click = Next Item, Hold = Back to Festival
+    if (s_csm.get_screen_mode() == SCREEN_SETTINGS) {
+        if (M5.BtnB.wasHold()) {
+            s_csm.exit_settings();
+        } else if (M5.BtnB.wasClicked()) {
+            s_csm.settings_next_item();
+        }
+    } else {
+        if (M5.BtnB.wasHold()) {
+            s_csm.enter_settings();
+        } else if (M5.BtnB.wasClicked()) {
+            s_csm.cycle_character_forward();
+        }
     }
 
-    // 3. Physical Button A: Live press/hold synchronization & effect trigger
-    if (M5.BtnA.wasPressed()) {
-        s_csm.on_button_a_down(now);
-    }
-    if (M5.BtnA.wasReleased()) {
-        s_csm.on_button_a_up(now);
+    // 3. Physical Button A (Front Thumb Button):
+    // - In Festival Stage: Press = Hold Sync Start, Release = Hold Sync End (Short tap = Celebrate)
+    // - In Settings Screen: Click = Toggle / Adjust Selected Setting
+    if (s_csm.get_screen_mode() == SCREEN_SETTINGS) {
+        if (M5.BtnA.wasClicked()) {
+            s_csm.settings_toggle_current();
+        }
+    } else {
+        if (M5.BtnA.wasPressed()) {
+            s_csm.on_button_a_down(now);
+        }
+        if (M5.BtnA.wasReleased()) {
+            s_csm.on_button_a_up(now);
+        }
     }
 
-    // 4. Update IMU motion & deliberate gesture detection
+    // 4. Update IMU motion & deliberate flick-to-start gesture detection
     s_imu.update(s_csm, now);
 
-    // 5. Advance controller state machine (bounded retries, sync refreshes, toasts)
+    // 5. Advance controller state machine (lifecycle, retries, sound sequencer)
     s_csm.tick(now);
 
-    // 6. Pump radio queue (broadcast outgoing actions, drain incoming ACKs)
+    // 6. Pump radio queue (broadcast outgoing actions, receive ACKs)
     s_radio.update(s_csm, now);
 
-    // 7. Render UI frame onto double-buffered canvas (~35 FPS rate-limited)
+    // 7. Render UI frame onto double-buffered canvas (non-blocking rate limiter)
     s_ui.render(s_csm, now);
 
     // Yield to FreeRTOS background scheduler

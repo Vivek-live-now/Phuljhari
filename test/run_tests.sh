@@ -54,6 +54,8 @@ ${CXX} -std=c++17 \
     -I"${REPO_ROOT}/controller/include" \
     -I"${REPO_ROOT}/controller/src" \
     -I"${REPO_ROOT}/test" \
+    "${REPO_ROOT}/controller/src/controller_settings.cpp" \
+    "${REPO_ROOT}/controller/src/controller_sound.cpp" \
     "${REPO_ROOT}/controller/src/controller_state_machine.cpp" \
     "${REPO_ROOT}/test/test_controller_sm.cpp" \
     -o "${TEST_CONTROLLER_SM_BIN}"
@@ -68,6 +70,8 @@ ${CXX} -std=c++17 \
     -I"${REPO_ROOT}/controller/src" \
     -I"${REPO_ROOT}/test" \
     "${REPO_ROOT}/receiver/src/receiver_state_machine.cpp" \
+    "${REPO_ROOT}/controller/src/controller_settings.cpp" \
+    "${REPO_ROOT}/controller/src/controller_sound.cpp" \
     "${REPO_ROOT}/controller/src/controller_state_machine.cpp" \
     "${REPO_ROOT}/test/test_acceptance.cpp" \
     -o "${TEST_ACCEPTANCE_BIN}"
