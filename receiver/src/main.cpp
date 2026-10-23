@@ -68,6 +68,7 @@ void loop() {
         s_state_machine.get_state(),
         s_state_machine.get_active_effect(),
         s_state_machine.get_active_intensity(),
+        s_state_machine.is_button_indicator_active(),
         now
     );
 

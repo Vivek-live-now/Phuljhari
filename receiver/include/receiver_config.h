@@ -51,7 +51,14 @@
  * Onboard LED GPIO Pin.
  * Standard ESP32 DevKit V1 / DOIT boards typically use GPIO 2.
  * Some NodeMCU-32S boards use GPIO 2; certain clones use GPIO 4, 5, or 16.
- * Check your board's schematic if the onboard LED does not illuminate.
+ *
+ * IMPORTANT HARDWARE / BOOT ADVISORY:
+ * GPIO 2 is an ESP32 strapping pin (MTDO / bootloader strap).
+ * If pulled HIGH externally during power-up or reset, it may prevent
+ * the ESP32 from booting into normal SPI flash run mode.
+ * The firmware guarantees that GPIO 2 is ONLY configured as an OUTPUT
+ * inside setup() after the bootloader has already transferred execution.
+ * DO NOT attach external pull-up circuits to GPIO 2.
  */
 #define PHULJHARI_CONFIG_ONBOARD_LED_PIN    2
 

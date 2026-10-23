@@ -250,6 +250,59 @@ static bool test_sm_wire_packet_processing() {
 }
 
 /* -------------------------------------------------------------------------
+ * Test 8: Live Button State Synchronization & Receiver Timeout Failsafe
+ * ------------------------------------------------------------------------- */
+static bool test_sm_live_button_synchronization() {
+    ReceiverStateMachine sm;
+    sm.init(1000);
+
+    SM_ASSERT(!sm.is_button_indicator_active(), "Button indicator should start inactive");
+
+    // 1. Send BUTTON_DOWN
+    ButtonEventMsg btn_down = { 0, 0, 0 };
+    uint8_t wire[PHULJHARI_MAX_FRAME_SIZE];
+    size_t wire_len = 0;
+    StatusCode st = serialize_button_event(MSG_TYPE_BUTTON_DOWN, 201, &btn_down, wire, sizeof(wire), &wire_len);
+    SM_ASSERT(st == STATUS_OK, "serialize_button_event failed");
+
+    uint8_t resp_buf[PHULJHARI_MAX_FRAME_SIZE];
+    size_t resp_len = 0;
+    bool has_resp = false;
+    st = sm.process_incoming_packet(wire, wire_len, 1000, resp_buf, sizeof(resp_buf), &resp_len, &has_resp);
+    SM_ASSERT(st == STATUS_OK, "BUTTON_DOWN processed");
+    SM_ASSERT(sm.is_button_indicator_active(), "Button indicator must be active while held");
+
+    // 2. Advance time 200ms with tick -> should remain active
+    sm.tick(1200);
+    SM_ASSERT(sm.is_button_indicator_active(), "Indicator remains active before timeout");
+
+    // 3. Send BUTTON_SYNC at 1200ms -> resets timeout
+    ButtonEventMsg btn_sync = { 0, 0, 200 };
+    st = serialize_button_event(MSG_TYPE_BUTTON_SYNC, 202, &btn_sync, wire, sizeof(wire), &wire_len);
+    st = sm.process_incoming_packet(wire, wire_len, 1200, resp_buf, sizeof(resp_buf), &resp_len, &has_resp);
+    SM_ASSERT(st == STATUS_OK, "BUTTON_SYNC processed");
+    SM_ASSERT(sm.is_button_indicator_active(), "Indicator remains active after sync");
+
+    // 4. Send BUTTON_UP at 1400ms -> immediately deactivates indicator
+    ButtonEventMsg btn_up = { 0, 0, 400 };
+    st = serialize_button_event(MSG_TYPE_BUTTON_UP, 203, &btn_up, wire, sizeof(wire), &wire_len);
+    st = sm.process_incoming_packet(wire, wire_len, 1400, resp_buf, sizeof(resp_buf), &resp_len, &has_resp);
+    SM_ASSERT(st == STATUS_OK, "BUTTON_UP processed");
+    SM_ASSERT(!sm.is_button_indicator_active(), "Indicator must deactivate immediately on BUTTON_UP");
+
+    // 5. Test Failsafe Auto-Cutoff (if release packet is lost over the air)
+    st = serialize_button_event(MSG_TYPE_BUTTON_DOWN, 204, &btn_down, wire, sizeof(wire), &wire_len);
+    st = sm.process_incoming_packet(wire, wire_len, 2000, resp_buf, sizeof(resp_buf), &resp_len, &has_resp);
+    SM_ASSERT(sm.is_button_indicator_active(), "Indicator active again");
+
+    // Advance beyond PHULJHARI_BUTTON_HOLD_TIMEOUT_MS (600ms): 2000 + 601 = 2601 ms
+    sm.tick(2601);
+    SM_ASSERT(!sm.is_button_indicator_active(), "Indicator must auto-cutoff after timeout failsafe");
+
+    return true;
+}
+
+/* -------------------------------------------------------------------------
  * Main SM Test Runner
  * ------------------------------------------------------------------------- */
 int main() {
@@ -264,6 +317,7 @@ int main() {
     RUN_SM_TEST(test_sm_stop_command);
     RUN_SM_TEST(test_sm_watchdog_cutoff);
     RUN_SM_TEST(test_sm_wire_packet_processing);
+    RUN_SM_TEST(test_sm_live_button_synchronization);
 
     std::cout << "====================================================\n";
     std::cout << "Receiver SM Summary: " << g_sm_tests_passed << "/" << g_sm_tests_run << " passed";

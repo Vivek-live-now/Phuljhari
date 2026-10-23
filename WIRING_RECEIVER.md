@@ -50,12 +50,25 @@ Connect a 5V WS2812B addressable LED strip (e.g. 30 LEDs) directly to the ESP32-
 | **GND** | **GND** | Common Ground | Black / White |
 | **GPIO 18** | **DIN (Data In)** | High-speed data line (via 330Ω - 470Ω resistor) | Green / Yellow |
 
-### Best Practices & Hardware Protection
-1. **Current Budget & USB Safety:**
-   * 30 WS2812B LEDs at full white draw up to ~1.8A.
-   * Project Phuljhari firmware enforces a **strict software brightness cap** of `180 / 255` (~70% maximum power) in [`shared/phuljhari_safety.h`](file:///data/data/com.termux/files/home/phuljhari/shared/phuljhari_safety.h).
-   * Average current during Phuljhari, Anar, and Patakha animations remains below `500 mA`, safely powered from a standard USB host or 5V power adapter.
-2. **Data Line Resistor:**
+### Best Practices & Realistic LED Power Budget
+1. **Realistic Power Requirements & Limits:**
+   * A single WS2812B / SK6812 RGB LED draws up to **60 mA** at full white (20 mA per color channel: Red, Green, Blue at 100% brightness).
+   * **30 LEDs on full white draw up to 1.8 A (9 Watts)!**
+   * **60 LEDs on full white draw up to 3.6 A (18 Watts)!**
+   * Even with the firmware's software brightness cap of `180 / 255` (~70%), 30 fully illuminated white LEDs draw **1.26 A**, which exceeds standard PC USB 2.0 ports (500 mA) and can trigger USB overcurrent brownout resets.
+   * **Why the default animations are safe on USB:**
+     * *Phuljhari:* Mostly warm amber/gold (red + green channels, blue off, ~20-30% active LEDs at any given moment). Average draw: ~250–350 mA.
+     * *Anar:* Sparse fountain stream (maximum 8 active particle sparks at any instant). Average draw: ~200–300 mA.
+     * *Patakha:* Brief expanding wave with rapid decay. Peak burst ~450 mA for <100 ms.
+   * **Hardware Recommendation:** If you expand the strip beyond 30 LEDs, or test custom full-white effects, **use an external 5V 2A–3A DC regulated power supply** connected directly to the strip's +5V and GND, ensuring the ESP32 ground and power supply ground are securely tied together.
+
+2. **Strapping Pin Advisory for Onboard LED (GPIO 2):**
+   * GPIO 2 is an internal boot strapping pin (`MTDO`) on the ESP32.
+   * If held HIGH during power-up or reset by an external circuit or pull-up resistor, the ESP32 may fail to boot from flash memory and enter download mode.
+   * The firmware configures GPIO 2 strictly as an output after bootloader initialization.
+   * Do not attach pull-up resistors or high-voltage external lines to GPIO 2.
+
+3. **Data Line Resistor:**
    * Placing a `330Ω` to `470Ω` resistor between `GPIO 18` and the strip's `DIN` prevents signal reflections and protects the ESP32 GPIO.
 3. **Power Capacitor:**
    * Placing a `100 µF` to `1000 µF` (6.3V or higher) electrolytic capacitor across +5V and GND near the strip helps prevent USB brownouts during sudden brightness surges.

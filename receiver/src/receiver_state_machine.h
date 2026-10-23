@@ -95,12 +95,22 @@ public:
         protocol::StatusRespMsg* out_resp
     );
 
+    /**
+     * @brief Direct handler for live button synchronization (BUTTON_DOWN, UP, SYNC).
+     */
+    protocol::StatusCode handle_button_event(
+        protocol::MessageType type,
+        const protocol::ButtonEventMsg& btn_msg,
+        uint32_t current_time_ms
+    );
+
     /* State Queries */
     protocol::ReceiverState get_state() const { return current_state_; }
     protocol::EffectId get_active_effect() const { return active_effect_; }
     uint8_t get_active_intensity() const { return active_intensity_; }
     uint16_t get_remaining_ms(uint32_t current_time_ms) const;
     bool is_output_active() const { return (current_state_ == protocol::RECV_STATE_EFFECT_ACTIVE); }
+    bool is_button_indicator_active() const { return button_hold_indicator_active_; }
     uint32_t get_total_effects() const { return total_effects_executed_; }
     uint32_t get_last_activity_ms() const { return last_activity_ms_; }
 
@@ -113,6 +123,10 @@ private:
     uint32_t cooldown_start_ms_;
     uint32_t last_activity_ms_;
     uint32_t total_effects_executed_;
+
+    /* Live button indicator state */
+    bool button_hold_indicator_active_;
+    uint32_t button_hold_last_rx_ms_;
 
     protocol::DuplicateFilter duplicate_filter_;
 

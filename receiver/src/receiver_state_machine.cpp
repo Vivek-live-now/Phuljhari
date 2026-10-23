@@ -18,6 +18,8 @@ ReceiverStateMachine::ReceiverStateMachine()
       cooldown_start_ms_(0),
       last_activity_ms_(0),
       total_effects_executed_(0),
+      button_hold_indicator_active_(false),
+      button_hold_last_rx_ms_(0),
       has_cached_ack_(false) {
     std::memset(&cached_ack_, 0, sizeof(cached_ack_));
 }
@@ -31,13 +33,22 @@ void ReceiverStateMachine::init(uint32_t current_time_ms) {
     cooldown_start_ms_ = 0;
     last_activity_ms_ = current_time_ms;
     total_effects_executed_ = 0;
+    button_hold_indicator_active_ = false;
+    button_hold_last_rx_ms_ = 0;
     has_cached_ack_ = false;
     duplicate_filter_.reset();
     std::memset(&cached_ack_, 0, sizeof(cached_ack_));
 }
 
 void ReceiverStateMachine::tick(uint32_t current_time_ms) {
-    /* 1. Watchdog safety check:
+    /* 1. Live button hold timeout check */
+    if (button_hold_indicator_active_) {
+        if (current_time_ms - button_hold_last_rx_ms_ >= PHULJHARI_BUTTON_HOLD_TIMEOUT_MS) {
+            button_hold_indicator_active_ = false;
+        }
+    }
+
+    /* 2. Watchdog safety check:
      * If no radio activity or command has occurred within the safety timeout,
      * immediately revert outputs to inactive safe idle. */
     if (current_time_ms - last_activity_ms_ >= PHULJHARI_SAFETY_WATCHDOG_TIMEOUT_MS) {
@@ -46,6 +57,7 @@ void ReceiverStateMachine::tick(uint32_t current_time_ms) {
             active_effect_ = protocol::EFFECT_ID_IDLE;
             active_intensity_ = 0;
             effect_duration_ms_ = 0;
+            button_hold_indicator_active_ = false;
         }
         return;
     }
@@ -194,6 +206,18 @@ protocol::StatusCode ReceiverStateMachine::process_incoming_packet(
             return protocol::STATUS_OK;
         }
 
+        case protocol::MSG_TYPE_BUTTON_DOWN:
+        case protocol::MSG_TYPE_BUTTON_UP:
+        case protocol::MSG_TYPE_BUTTON_SYNC: {
+            protocol::ButtonEventMsg btn;
+            protocol::StatusCode btn_st = protocol::deserialize_button_event(&frame, &btn);
+            if (btn_st == protocol::STATUS_OK) {
+                handle_button_event((protocol::MessageType)frame.msg_type, btn, current_time_ms);
+            }
+            // For live button events, we do not require a heavy return payload to maintain minimal airtime
+            return btn_st;
+        }
+
         default:
             return protocol::STATUS_ERR_INVALID_TYPE;
     }
@@ -310,6 +334,20 @@ void ReceiverStateMachine::handle_status_req(
         out_resp->remaining_duration_ms = get_remaining_ms(current_time_ms);
         out_resp->total_effects_executed = total_effects_executed_;
     }
+}
+
+protocol::StatusCode ReceiverStateMachine::handle_button_event(
+    protocol::MessageType type,
+    const protocol::ButtonEventMsg& /*btn_msg*/,
+    uint32_t current_time_ms
+) {
+    if (type == protocol::MSG_TYPE_BUTTON_DOWN || type == protocol::MSG_TYPE_BUTTON_SYNC) {
+        button_hold_indicator_active_ = true;
+        button_hold_last_rx_ms_ = current_time_ms;
+    } else if (type == protocol::MSG_TYPE_BUTTON_UP) {
+        button_hold_indicator_active_ = false;
+    }
+    return protocol::STATUS_OK;
 }
 
 } // namespace receiver

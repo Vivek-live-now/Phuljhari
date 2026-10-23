@@ -54,7 +54,10 @@ enum MessageType : uint8_t {
     MSG_TYPE_EFFECT_ACK  = 0x04, /**< Application-level confirmation of effect command */
     MSG_TYPE_EFFECT_STOP = 0x05, /**< Immediate stop command reverting to safe idle */
     MSG_TYPE_STATUS_REQ  = 0x06, /**< Query receiver state and telemetry */
-    MSG_TYPE_STATUS_RESP = 0x07  /**< Receiver state and telemetry report */
+    MSG_TYPE_STATUS_RESP = 0x07, /**< Receiver state and telemetry report */
+    MSG_TYPE_BUTTON_DOWN = 0x08, /**< Live button press synchronization (status LED ON) */
+    MSG_TYPE_BUTTON_UP   = 0x09, /**< Live button release synchronization (status LED OFF) */
+    MSG_TYPE_BUTTON_SYNC = 0x0A  /**< Periodic hold refresh to prevent receiver timeout */
 };
 
 /* -------------------------------------------------------------------------
@@ -227,11 +230,20 @@ struct StatusRespMsg {
 
 #define PHULJHARI_PAYLOAD_LEN_STATUS_RESP ((uint8_t)8)
 
+struct ButtonEventMsg {
+    uint8_t indicator_id;      /**< Target indicator on receiver (0 = Onboard Status LED) */
+    uint8_t button_id;         /**< Button ID (0 = BtnA, 1 = BtnB) */
+    uint16_t hold_duration_ms; /**< Milliseconds held (for periodic sync refreshes) */
+};
+
+#define PHULJHARI_PAYLOAD_LEN_BUTTON_EVENT ((uint8_t)4)
+#define PHULJHARI_BUTTON_HOLD_TIMEOUT_MS   ((uint32_t)600) /* Safe auto-cutoff if release packet lost */
+
 /* -------------------------------------------------------------------------
  * Validation Helpers
  * ------------------------------------------------------------------------- */
 static inline bool is_valid_message_type(uint8_t msg_type) {
-    return (msg_type >= MSG_TYPE_PING && msg_type <= MSG_TYPE_STATUS_RESP);
+    return (msg_type >= MSG_TYPE_PING && msg_type <= MSG_TYPE_BUTTON_SYNC);
 }
 
 static inline bool is_valid_effect_id(uint8_t effect_id) {
@@ -640,6 +652,58 @@ static inline StatusCode deserialize_status_resp(
     out_resp->receiver_state = frame->payload[1];
     out_resp->remaining_duration_ms = read_u16_be(&frame->payload[2]);
     out_resp->total_effects_executed = read_u32_be(&frame->payload[4]);
+    return STATUS_OK;
+}
+
+/**
+ * @brief Serializes MSG_TYPE_BUTTON_DOWN, BUTTON_UP, or BUTTON_SYNC.
+ */
+static inline StatusCode serialize_button_event(
+    MessageType type,
+    uint16_t seq,
+    const ButtonEventMsg* btn,
+    uint8_t* out_buf,
+    size_t out_buf_capacity,
+    size_t* out_frame_len
+) {
+    if (btn == NULL) return STATUS_ERR_TRUNCATED;
+    if (type != MSG_TYPE_BUTTON_DOWN && type != MSG_TYPE_BUTTON_UP && type != MSG_TYPE_BUTTON_SYNC) {
+        return STATUS_ERR_INVALID_TYPE;
+    }
+    uint8_t payload[PHULJHARI_PAYLOAD_LEN_BUTTON_EVENT];
+    payload[0] = btn->indicator_id;
+    payload[1] = btn->button_id;
+    write_u16_be(&payload[2], btn->hold_duration_ms);
+
+    return serialize_frame(
+        (uint8_t)type,
+        seq,
+        payload,
+        PHULJHARI_PAYLOAD_LEN_BUTTON_EVENT,
+        out_buf,
+        out_buf_capacity,
+        out_frame_len
+    );
+}
+
+/**
+ * @brief Deserializes MSG_TYPE_BUTTON_DOWN, BUTTON_UP, or BUTTON_SYNC.
+ */
+static inline StatusCode deserialize_button_event(
+    const RawFrame* frame,
+    ButtonEventMsg* out_btn
+) {
+    if (frame == NULL || out_btn == NULL) return STATUS_ERR_TRUNCATED;
+    if (frame->msg_type != MSG_TYPE_BUTTON_DOWN &&
+        frame->msg_type != MSG_TYPE_BUTTON_UP &&
+        frame->msg_type != MSG_TYPE_BUTTON_SYNC) {
+        return STATUS_ERR_INVALID_TYPE;
+    }
+    if (frame->payload_len != PHULJHARI_PAYLOAD_LEN_BUTTON_EVENT) return STATUS_ERR_PAYLOAD_LENGTH;
+
+    out_btn->indicator_id = frame->payload[0];
+    out_btn->button_id = frame->payload[1];
+    out_btn->hold_duration_ms = read_u16_be(&frame->payload[2]);
     return STATUS_OK;
 }
 

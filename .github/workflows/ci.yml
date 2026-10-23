@@ -54,3 +54,7 @@ jobs:
       - name: Build Receiver Firmware (esp32dev)
         run: |
           pio run -e receiver_esp32dev
+
+      - name: Build Controller Firmware (m5sticks3)
+        run: |
+          pio run -e controller_m5sticks3

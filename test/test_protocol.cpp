@@ -164,7 +164,7 @@ static bool test_invalid_types_and_effects() {
 
     // Unknown message types
     TEST_ASSERT(serialize_frame(0x00, 1, NULL, 0, buf, sizeof(buf), &out_len) == STATUS_ERR_INVALID_TYPE, "Should reject msg_type 0x00");
-    TEST_ASSERT(serialize_frame(0x08, 1, NULL, 0, buf, sizeof(buf), &out_len) == STATUS_ERR_INVALID_TYPE, "Should reject msg_type 0x08");
+    TEST_ASSERT(serialize_frame(0x0B, 1, NULL, 0, buf, sizeof(buf), &out_len) == STATUS_ERR_INVALID_TYPE, "Should reject msg_type 0x0B");
     TEST_ASSERT(serialize_frame(0xFF, 1, NULL, 0, buf, sizeof(buf), &out_len) == STATUS_ERR_INVALID_TYPE, "Should reject msg_type 0xFF");
 
     // Invalid Effect IDs in EffectCmd
@@ -386,6 +386,20 @@ static bool test_all_typed_messages() {
     TEST_ASSERT(resp_in.receiver_state == RECV_STATE_EFFECT_ACTIVE, "Status state match");
     TEST_ASSERT(resp_in.remaining_duration_ms == 3200, "Status duration match");
     TEST_ASSERT(resp_in.total_effects_executed == 42, "Status total match");
+
+    // Button Events (BUTTON_DOWN, BUTTON_UP, BUTTON_SYNC)
+    ButtonEventMsg btn_down = { 0, 0, 0 };
+    TEST_ASSERT(serialize_button_event(MSG_TYPE_BUTTON_DOWN, 14, &btn_down, buf, sizeof(buf), &len) == STATUS_OK, "Button down serialize");
+    TEST_ASSERT(deserialize_frame(buf, len, &frame) == STATUS_OK, "Button down frame deserialize");
+    ButtonEventMsg btn_in;
+    TEST_ASSERT(deserialize_button_event(&frame, &btn_in) == STATUS_OK, "Button down msg deserialize");
+    TEST_ASSERT(btn_in.indicator_id == 0 && btn_in.button_id == 0 && btn_in.hold_duration_ms == 0, "Button down content match");
+
+    ButtonEventMsg btn_up = { 0, 0, 350 };
+    TEST_ASSERT(serialize_button_event(MSG_TYPE_BUTTON_UP, 15, &btn_up, buf, sizeof(buf), &len) == STATUS_OK, "Button up serialize");
+    TEST_ASSERT(deserialize_frame(buf, len, &frame) == STATUS_OK, "Button up frame deserialize");
+    TEST_ASSERT(deserialize_button_event(&frame, &btn_in) == STATUS_OK, "Button up msg deserialize");
+    TEST_ASSERT(btn_in.hold_duration_ms == 350, "Button up hold duration match");
 
     return true;
 }

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# Project Phuljhari ✨ Native Protocol & Receiver State Machine Test Runner
+# Project Phuljhari ✨ Native Protocol, Receiver & Controller Test Runner
 # ==============================================================================
 set -euo pipefail
 
@@ -9,6 +9,7 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 BUILD_DIR="${REPO_ROOT}/build_test"
 TEST_PROTOCOL_BIN="${BUILD_DIR}/test_protocol"
 TEST_RECEIVER_SM_BIN="${BUILD_DIR}/test_receiver_sm"
+TEST_CONTROLLER_SM_BIN="${BUILD_DIR}/test_controller_sm"
 
 echo "--------------------------------------------------------"
 echo "Building Phuljhari Native Test Suite..."
@@ -45,10 +46,22 @@ ${CXX} -std=c++17 \
     "${REPO_ROOT}/test/test_receiver_sm.cpp" \
     -o "${TEST_RECEIVER_SM_BIN}"
 
+echo "Compiling controller state machine tests with ${CXX}..."
+${CXX} -std=c++17 \
+    -Wall -Wextra -Werror \
+    -I"${REPO_ROOT}/shared" \
+    -I"${REPO_ROOT}/controller/include" \
+    -I"${REPO_ROOT}/controller/src" \
+    -I"${REPO_ROOT}/test" \
+    "${REPO_ROOT}/controller/src/controller_state_machine.cpp" \
+    "${REPO_ROOT}/test/test_controller_sm.cpp" \
+    -o "${TEST_CONTROLLER_SM_BIN}"
+
 echo "Compilation successful. Executing tests..."
 echo "--------------------------------------------------------"
 "${TEST_PROTOCOL_BIN}"
 "${TEST_RECEIVER_SM_BIN}"
+"${TEST_CONTROLLER_SM_BIN}"
 
 echo "--------------------------------------------------------"
 echo "All native unit tests PASSED successfully."

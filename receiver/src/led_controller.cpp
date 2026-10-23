@@ -80,10 +80,11 @@ void LedController::update(
     protocol::ReceiverState state,
     protocol::EffectId effect,
     uint8_t intensity_pct,
+    bool button_indicator_active,
     uint32_t current_time_ms
 ) {
-    // 1. Update Bench-test Onboard LED rhythm
-    update_onboard_led(state, effect, current_time_ms);
+    // 1. Update Bench-test Onboard LED rhythm & live button status
+    update_onboard_led(state, effect, button_indicator_active, current_time_ms);
 
     // 2. Frame-rate limiter for WS2812B strip rendering (~50 FPS / 20 ms)
     if (current_time_ms - last_frame_ms_ < PHULJHARI_CONFIG_FRAME_INTERVAL_MS) {
@@ -262,12 +263,18 @@ void LedController::render_safe_idle() {
 void LedController::update_onboard_led(
     protocol::ReceiverState state,
     protocol::EffectId effect,
+    bool button_indicator_active,
     uint32_t current_time_ms
 ) {
 #if PHULJHARI_ENABLE_ONBOARD_LED
     bool led_on = false;
 
-    if (state == protocol::RECV_STATE_EFFECT_ACTIVE) {
+    // 1. Live synchronized button hold takes immediate priority on separate status LED
+    if (button_indicator_active) {
+        led_on = true;
+    }
+    // 2. Active decorative effect pulse rhythms
+    else if (state == protocol::RECV_STATE_EFFECT_ACTIVE) {
         switch (effect) {
             case protocol::EFFECT_ID_PHULJHARI:
                 // Fast festive shimmer (toggles every 50ms)

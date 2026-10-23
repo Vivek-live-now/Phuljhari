@@ -47,6 +47,7 @@ public:
         protocol::ReceiverState state,
         protocol::EffectId effect,
         uint8_t intensity_pct,
+        bool button_indicator_active,
         uint32_t current_time_ms
     );
 
@@ -66,6 +67,7 @@ private:
     void update_onboard_led(
         protocol::ReceiverState state,
         protocol::EffectId effect,
+        bool button_indicator_active,
         uint32_t current_time_ms
     );
 
