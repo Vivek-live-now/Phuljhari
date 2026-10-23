@@ -100,6 +100,7 @@ public:
      */
     protocol::StatusCode handle_button_event(
         protocol::MessageType type,
+        uint16_t seq,
         const protocol::ButtonEventMsg& btn_msg,
         uint32_t current_time_ms
     );
@@ -127,6 +128,7 @@ private:
     /* Live button indicator state */
     bool button_hold_indicator_active_;
     uint32_t button_hold_last_rx_ms_;
+    uint16_t last_button_seq_;
 
     protocol::DuplicateFilter duplicate_filter_;
 

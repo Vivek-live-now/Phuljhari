@@ -20,6 +20,7 @@ ReceiverStateMachine::ReceiverStateMachine()
       total_effects_executed_(0),
       button_hold_indicator_active_(false),
       button_hold_last_rx_ms_(0),
+      last_button_seq_(0),
       has_cached_ack_(false) {
     std::memset(&cached_ack_, 0, sizeof(cached_ack_));
 }
@@ -35,6 +36,7 @@ void ReceiverStateMachine::init(uint32_t current_time_ms) {
     total_effects_executed_ = 0;
     button_hold_indicator_active_ = false;
     button_hold_last_rx_ms_ = 0;
+    last_button_seq_ = 0;
     has_cached_ack_ = false;
     duplicate_filter_.reset();
     std::memset(&cached_ack_, 0, sizeof(cached_ack_));
@@ -212,7 +214,7 @@ protocol::StatusCode ReceiverStateMachine::process_incoming_packet(
             protocol::ButtonEventMsg btn;
             protocol::StatusCode btn_st = protocol::deserialize_button_event(&frame, &btn);
             if (btn_st == protocol::STATUS_OK) {
-                handle_button_event((protocol::MessageType)frame.msg_type, btn, current_time_ms);
+                btn_st = handle_button_event((protocol::MessageType)frame.msg_type, frame.seq, btn, current_time_ms);
             }
             // For live button events, we do not require a heavy return payload to maintain minimal airtime
             return btn_st;
@@ -338,14 +340,35 @@ void ReceiverStateMachine::handle_status_req(
 
 protocol::StatusCode ReceiverStateMachine::handle_button_event(
     protocol::MessageType type,
+    uint16_t seq,
     const protocol::ButtonEventMsg& /*btn_msg*/,
     uint32_t current_time_ms
 ) {
-    if (type == protocol::MSG_TYPE_BUTTON_DOWN || type == protocol::MSG_TYPE_BUTTON_SYNC) {
-        button_hold_indicator_active_ = true;
-        button_hold_last_rx_ms_ = current_time_ms;
+    if (type == protocol::MSG_TYPE_BUTTON_DOWN) {
+        // Enforce sequence ordering: only newer sequence can start a hold session
+        int16_t diff = (int16_t)(seq - last_button_seq_);
+        if (diff > 0 || last_button_seq_ == 0) {
+            button_hold_indicator_active_ = true;
+            button_hold_last_rx_ms_ = current_time_ms;
+            last_button_seq_ = seq;
+        }
+    } else if (type == protocol::MSG_TYPE_BUTTON_SYNC) {
+        // Stale / orphaned sync protection:
+        // A periodic sync packet CANNOT reactivate an expired or released hold!
+        if (!button_hold_indicator_active_) {
+            return protocol::STATUS_ERR_DUPLICATE;
+        }
+        int16_t diff = (int16_t)(seq - last_button_seq_);
+        if (diff > 0) {
+            button_hold_last_rx_ms_ = current_time_ms;
+            last_button_seq_ = seq;
+        }
     } else if (type == protocol::MSG_TYPE_BUTTON_UP) {
-        button_hold_indicator_active_ = false;
+        int16_t diff = (int16_t)(seq - last_button_seq_);
+        if (diff >= 0 || last_button_seq_ == 0) {
+            button_hold_indicator_active_ = false;
+            last_button_seq_ = seq;
+        }
     }
     return protocol::STATUS_OK;
 }
