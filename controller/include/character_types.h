@@ -49,7 +49,9 @@ enum SoundEffectId : uint8_t {
     SFX_GARLAND      = 5,
     SFX_BOMB         = 6,
     SFX_CHAKRI       = 7,
-    SFX_CANDLE_DIYA  = 8
+    SFX_CANDLE       = 8,
+    SFX_DIYA         = 9,
+    SFX_CANDLE_DIYA  = 8 /**< Backward compatibility alias for candle/diya */
 };
 
 /**
@@ -71,8 +73,8 @@ static const CharacterDescriptor CHARACTER_REGISTRY[CHAR_COUNT] = {
     { CHAR_GARLAND,    "GARLAND",     "Ladi Pops",      3800, protocol::EFFECT_ID_PATAKHA,   SFX_GARLAND },
     { CHAR_BOMB,       "PATAKHA BOMB","Friendly Mascot",2600, protocol::EFFECT_ID_PATAKHA,   SFX_BOMB },
     { CHAR_CHAKRI,     "CHAKRI",      "Spinning Wheel", 4000, protocol::EFFECT_ID_ANAR,      SFX_CHAKRI },
-    { CHAR_CANDLE,     "CANDLE",      "Wax Flame",      3500, protocol::EFFECT_ID_PHULJHARI, SFX_CANDLE_DIYA },
-    { CHAR_DIYA,       "DIYA",        "Sacred Lamp",    3500, protocol::EFFECT_ID_PHULJHARI, SFX_CANDLE_DIYA }
+    { CHAR_CANDLE,     "CANDLE",      "Wax Flame",      3500, protocol::EFFECT_ID_PHULJHARI, SFX_CANDLE },
+    { CHAR_DIYA,       "DIYA",        "Sacred Lamp",    3500, protocol::EFFECT_ID_PHULJHARI, SFX_DIYA }
 };
 
 static inline const CharacterDescriptor& get_character_descriptor(CharacterId id) {

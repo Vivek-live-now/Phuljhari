@@ -171,38 +171,91 @@ static bool test_ctrl_sound_manager() {
     CTRL_ASSERT(sound.get_volume() == 75, "Default volume 75%");
     CTRL_ASSERT(!sound.is_playing(), "No sound playing initially");
 
-    // 1. Playing personality sound
+    // 1. All 8 Characters mapped to distinct valid sound IDs
+    for (size_t i = 0; i < CHAR_COUNT; ++i) {
+        CharacterId cid = (CharacterId)i;
+        const CharacterDescriptor& desc = get_character_descriptor(cid);
+        CTRL_ASSERT(desc.sound_id != SFX_NONE, "Character has designated sound ID");
+    }
+    CTRL_ASSERT(get_character_descriptor(CHAR_PHULJHARI).sound_id == SFX_PHULJHARI, "Phuljhari sound mapping");
+    CTRL_ASSERT(get_character_descriptor(CHAR_ANAR).sound_id == SFX_ANAR, "Anar sound mapping");
+    CTRL_ASSERT(get_character_descriptor(CHAR_SKY_ROCKET).sound_id == SFX_SKY_ROCKET, "Sky Rocket sound mapping");
+    CTRL_ASSERT(get_character_descriptor(CHAR_GARLAND).sound_id == SFX_GARLAND, "Garland sound mapping");
+    CTRL_ASSERT(get_character_descriptor(CHAR_BOMB).sound_id == SFX_BOMB, "Patakha Bomb sound mapping");
+    CTRL_ASSERT(get_character_descriptor(CHAR_CHAKRI).sound_id == SFX_CHAKRI, "Chakri sound mapping");
+    CTRL_ASSERT(get_character_descriptor(CHAR_CANDLE).sound_id == SFX_CANDLE, "Candle sound mapping");
+    CTRL_ASSERT(get_character_descriptor(CHAR_DIYA).sound_id == SFX_DIYA, "Diya sound mapping");
+
+    // 2. Playing procedural sound and verifying continuous generation
     sound.play(SFX_PHULJHARI, 1000);
     CTRL_ASSERT(sound.is_playing(), "Sound is playing");
     CTRL_ASSERT(sound.get_current_sound() == SFX_PHULJHARI, "Sound effect is Phuljhari");
+    CTRL_ASSERT(sound.get_total_events() > 0, "First event generated immediately");
 
-    // Advance steps in sequencer
-    sound.update(1080); // Step 1 finished
-    CTRL_ASSERT(sound.is_playing(), "Sound continues to next step");
+    // Advance through procedural updates
+    uint32_t first_events = sound.get_total_events();
+    sound.update(1080);
+    sound.update(1200);
+    CTRL_ASSERT(sound.is_playing(), "Phuljhari sizzle continues playing");
+    CTRL_ASSERT(sound.get_total_events() > first_events, "New procedural crackles generated");
 
-    sound.update(1500); // Sequence complete
+    // Full duration completion -> return to idle
+    sound.update(5000); // 3500ms duration passed
     CTRL_ASSERT(!sound.is_playing(), "Sound stopped after sequence completed");
 
-    // 2. Sound OFF silences audio immediately
-    sound.play(SFX_ANAR, 2000);
+    // 3. Sound OFF silences audio immediately
+    sound.play(SFX_ANAR, 6000);
     CTRL_ASSERT(sound.is_playing(), "Anar sound playing");
     sound.set_enabled(false);
     CTRL_ASSERT(!sound.is_playing(), "Sound OFF immediately silences output");
 
     // Playing while disabled must do nothing
-    sound.play(SFX_BOMB, 2100);
+    sound.play(SFX_BOMB, 6100);
     CTRL_ASSERT(!sound.is_playing(), "Play when disabled does nothing");
 
-    // 3. Volume 0 is silent
+    // 4. Volume 0 is silent
     sound.set_enabled(true);
     sound.set_volume(0);
-    sound.play(SFX_SKY_ROCKET, 2200);
+    sound.play(SFX_SKY_ROCKET, 6200);
     CTRL_ASSERT(!sound.is_playing(), "Volume 0 is strictly silent");
 
     // Restoring volume allows playback
     sound.set_volume(50);
-    sound.play(SFX_SKY_ROCKET, 2300);
+    sound.play(SFX_SKY_ROCKET, 6300);
     CTRL_ASSERT(sound.is_playing(), "Volume 50% plays audio");
+
+    // 5. Sound cancellation on active sound
+    sound.stop();
+    CTRL_ASSERT(!sound.is_playing(), "stop() cancels sound immediately");
+
+    // 6. Test all 8 sound profiles can be played and progress
+    SoundEffectId all_sfx[] = {
+        SFX_PHULJHARI, SFX_ANAR, SFX_SKY_ROCKET, SFX_GARLAND,
+        SFX_BOMB, SFX_CHAKRI, SFX_CANDLE, SFX_DIYA
+    };
+    for (size_t i = 0; i < 8; ++i) {
+        sound.play(all_sfx[i], 7000 + i * 100);
+        CTRL_ASSERT(sound.is_playing(), "Profile started playing");
+        CTRL_ASSERT(sound.get_current_sound() == all_sfx[i], "Correct sound profile active");
+        sound.update(7050 + i * 100);
+        sound.stop();
+        CTRL_ASSERT(!sound.is_playing(), "Sound cleanly stopped");
+    }
+
+    // 7. Rapid repeated triggers without queue overflow or clipping
+    for (int i = 0; i < 50; ++i) {
+        sound.play(SFX_GARLAND, 8000 + i * 10);
+        CTRL_ASSERT(sound.is_playing(), "Rapid trigger accepted without crash or overflow");
+    }
+    sound.stop();
+
+    // 8. Switching character cancels active sound in ControllerStateMachine
+    ControllerStateMachine csm;
+    csm.init(10000);
+    csm.trigger_animation(10000);
+    CTRL_ASSERT(csm.get_sound_manager().is_playing(), "Sound playing during celebration");
+    csm.cycle_character_forward();
+    CTRL_ASSERT(!csm.get_sound_manager().is_playing(), "Character change cancelled playing sound");
 
     return true;
 }

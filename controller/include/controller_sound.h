@@ -1,6 +1,6 @@
 /**
  * @file controller_sound.h
- * @brief Reusable sound manager and procedural synthesizer for Phuljhari 2.0 ✨
+ * @brief Procedural Diwali sound effects synthesizer for Phuljhari 2.1 ✨
  */
 
 #ifndef PHULJHARI_CONTROLLER_SOUND_H
@@ -13,11 +13,6 @@
 
 namespace phuljhari {
 namespace controller {
-
-struct ToneStep {
-    uint16_t freq_hz;
-    uint16_t duration_ms;
-};
 
 class ControllerSoundManager {
 public:
@@ -38,20 +33,28 @@ public:
 
     bool is_playing() const { return playing_; }
     SoundEffectId get_current_sound() const { return current_sfx_; }
+    uint32_t get_sound_elapsed_ms(uint32_t current_time_ms) const;
+
+    /* Testing & Telemetry Inspection */
+    uint16_t get_last_freq() const { return last_freq_; }
+    uint32_t get_total_events() const { return total_events_; }
 
 private:
-    void start_step(size_t step_idx, uint32_t current_time_ms);
+    void generate_next_event(uint32_t current_time_ms);
+    uint32_t prng_next();
 
     bool enabled_;
     uint8_t volume_percent_;
     bool playing_;
     SoundEffectId current_sfx_;
-    size_t current_step_idx_;
-    size_t total_steps_;
-    uint32_t step_start_ms_;
+    uint32_t sfx_start_ms_;
+    uint32_t sfx_duration_ms_;
+    uint32_t next_event_time_ms_;
+    uint32_t prng_state_;
+    uint16_t sub_step_;
 
-    static const size_t MAX_STEPS = 8;
-    ToneStep active_steps_[MAX_STEPS];
+    uint16_t last_freq_;
+    uint32_t total_events_;
 };
 
 } // namespace controller
