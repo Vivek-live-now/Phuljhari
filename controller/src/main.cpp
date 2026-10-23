@@ -58,6 +58,10 @@ void setup() {
     // 5. Initialize BMI270 6-Axis IMU (Subtle tilt & Flick detector)
     s_imu.begin();
 
+    // 6. Transmit initial boot ping to announce startup and resync sequence session with receiver
+    s_csm.send_initial_ping(millis());
+    s_radio.update(s_csm, millis());
+
     Serial.printf("[SYSTEM] Phuljhari 2.0 boot completed in %lu ms.\n", millis() - start_ms);
 }
 

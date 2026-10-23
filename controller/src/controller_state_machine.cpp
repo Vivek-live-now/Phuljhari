@@ -479,5 +479,23 @@ bool ControllerStateMachine::is_ack_toast_active(uint32_t current_time_ms) const
     return (current_time_ms - ack_received_ms_ < PHULJHARI_ACK_TOAST_DURATION_MS);
 }
 
+void ControllerStateMachine::send_initial_ping(uint32_t current_time_ms) {
+    if (!settings_mgr_.get().wireless_enabled) return;
+    last_ping_sent_ms_ = current_time_ms;
+    OutgoingAction act;
+    act.type = ACTION_SEND_PING;
+    act.seq = next_seq_++;
+    if (next_seq_ == 0) next_seq_ = 1;
+    protocol::PingMsg ping = { current_time_ms };
+    protocol::serialize_ping(
+        act.seq,
+        &ping,
+        act.buffer,
+        sizeof(act.buffer),
+        &act.length
+    );
+    queue_action(act);
+}
+
 } // namespace controller
 } // namespace phuljhari

@@ -499,6 +499,84 @@ static bool test_acceptance_imu_tilt_subtle_visual_only() {
 }
 
 /* -------------------------------------------------------------------------
+ * Acceptance Test 10: Controller Reboot & Immediate Button Response
+ * Verifies that when M5Stick reboots (resetting sequence number and uptime),
+ * the receiver immediately accepts button presses and effect commands without
+ * requiring the receiver to be rebooted.
+ * ------------------------------------------------------------------------- */
+static bool test_controller_reboot_and_button_response() {
+    ControllerStateMachine controller;
+    ReceiverStateMachine receiver;
+    controller.init(1000);
+    receiver.init(1000);
+
+    // 1. Establish initial communication and run a few transactions
+    // Initial boot ping at t=1000
+    controller.send_initial_ping(1000);
+    ACC_ASSERT(controller.has_pending_action(), "Initial ping queued");
+    OutgoingAction ping1 = controller.pop_pending_action();
+
+    uint8_t pong_buf[PHULJHARI_MAX_FRAME_SIZE];
+    size_t pong_len = 0;
+    bool has_pong = false;
+    receiver.process_incoming_packet(ping1.buffer, ping1.length, 1000, pong_buf, sizeof(pong_buf), &pong_len, &has_pong);
+    ACC_ASSERT(has_pong, "Receiver ponged");
+    controller.process_incoming_packet(pong_buf, pong_len, 1010);
+
+    // Press and hold button at seq 2, 3
+    controller.on_button_a_down(2000);
+    OutgoingAction btn_down = controller.pop_pending_action();
+    uint8_t dummy[PHULJHARI_MAX_FRAME_SIZE];
+    size_t dlen = 0;
+    bool dresp = false;
+    receiver.process_incoming_packet(btn_down.buffer, btn_down.length, 2000, dummy, sizeof(dummy), &dlen, &dresp);
+    ACC_ASSERT(receiver.is_button_indicator_active(), "GPIO 2 active before reboot");
+
+    // Release button
+    controller.on_button_a_up(2300);
+    OutgoingAction btn_up = controller.pop_pending_action();
+    receiver.process_incoming_packet(btn_up.buffer, btn_up.length, 2300, dummy, sizeof(dummy), &dlen, &dresp);
+    ACC_ASSERT(!receiver.is_button_indicator_active(), "GPIO 2 inactive after release");
+
+    // Send pings to advance controller sequence number past 20
+    for (int i = 0; i < 20; ++i) {
+        controller.tick(3000 + i * 2000);
+        if (controller.has_pending_action()) {
+            OutgoingAction p = controller.pop_pending_action();
+            receiver.process_incoming_packet(p.buffer, p.length, 3000 + i * 2000, dummy, sizeof(dummy), &dlen, &dresp);
+        }
+    }
+
+    // 2. SIMULATE M5STICK REBOOT: controller restarts, seq resets to 1, uptime resets to 100ms
+    controller.init(100);
+
+    // Initial boot ping from rebooted controller (announcing new session and uptime rollback)
+    controller.send_initial_ping(100);
+    ACC_ASSERT(controller.has_pending_action(), "Reboot ping queued");
+    OutgoingAction reb_ping = controller.pop_pending_action();
+    receiver.process_incoming_packet(reb_ping.buffer, reb_ping.length, 50000, pong_buf, sizeof(pong_buf), &pong_len, &has_pong);
+    ACC_ASSERT(has_pong, "Receiver accepted reboot ping");
+
+    // 3. User presses Button A on rebooted M5Stick (sequence number is now low: seq 2)
+    controller.on_button_a_down(50100);
+    ACC_ASSERT(controller.has_pending_action(), "Button down action queued");
+    OutgoingAction reb_btn_down = controller.pop_pending_action();
+    StatusCode st = receiver.process_incoming_packet(reb_btn_down.buffer, reb_btn_down.length, 50100, dummy, sizeof(dummy), &dlen, &dresp);
+    ACC_ASSERT(st == STATUS_OK, "Receiver MUST accept button down from rebooted controller");
+    ACC_ASSERT(receiver.is_button_indicator_active(), "GPIO 2 MUST turn ON after controller reboot without rebooting receiver!");
+
+    // Button release
+    controller.on_button_a_up(50400);
+    ACC_ASSERT(controller.has_pending_action(), "Button up action queued");
+    OutgoingAction reb_btn_up = controller.pop_pending_action();
+    st = receiver.process_incoming_packet(reb_btn_up.buffer, reb_btn_up.length, 50400, dummy, sizeof(dummy), &dlen, &dresp);
+    ACC_ASSERT(st == STATUS_OK, "Receiver MUST accept button up from rebooted controller");
+    ACC_ASSERT(!receiver.is_button_indicator_active(), "GPIO 2 MUST turn OFF on release");
+
+    return true;
+}
+
+/* -------------------------------------------------------------------------
  * Main Acceptance Test Runner
  * ------------------------------------------------------------------------- */
 int main() {
@@ -515,6 +593,7 @@ int main() {
     RUN_ACC_TEST(test_independent_led_control_paths);
     RUN_ACC_TEST(test_acceptance_gpio2_strictly_button_controlled);
     RUN_ACC_TEST(test_acceptance_imu_tilt_subtle_visual_only);
+    RUN_ACC_TEST(test_controller_reboot_and_button_response);
 
     std::cout << "====================================================\n";
     std::cout << "Acceptance Summary: " << g_acc_tests_passed << "/" << g_acc_tests_run << " passed";

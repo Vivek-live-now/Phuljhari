@@ -21,6 +21,8 @@ ReceiverStateMachine::ReceiverStateMachine()
       button_hold_indicator_active_(false),
       button_hold_last_rx_ms_(0),
       last_button_seq_(0),
+      last_controller_uptime_ms_(0),
+      has_controller_uptime_(false),
       has_cached_ack_(false) {
     std::memset(&cached_ack_, 0, sizeof(cached_ack_));
 }
@@ -37,6 +39,8 @@ void ReceiverStateMachine::init(uint32_t current_time_ms) {
     button_hold_indicator_active_ = false;
     button_hold_last_rx_ms_ = 0;
     last_button_seq_ = 0;
+    last_controller_uptime_ms_ = 0;
+    has_controller_uptime_ = false;
     has_cached_ack_ = false;
     duplicate_filter_.reset();
     std::memset(&cached_ack_, 0, sizeof(cached_ack_));
@@ -52,7 +56,7 @@ void ReceiverStateMachine::tick(uint32_t current_time_ms) {
 
     /* 2. Watchdog safety check:
      * If no radio activity or command has occurred within the safety timeout,
-     * immediately revert outputs to inactive safe idle. */
+     * immediately revert outputs to inactive safe idle and reset sequence tracking. */
     if (current_time_ms - last_activity_ms_ >= PHULJHARI_SAFETY_WATCHDOG_TIMEOUT_MS) {
         if (current_state_ != protocol::RECV_STATE_SAFE_IDLE) {
             current_state_ = protocol::RECV_STATE_SAFE_IDLE;
@@ -61,7 +65,21 @@ void ReceiverStateMachine::tick(uint32_t current_time_ms) {
             effect_duration_ms_ = 0;
             button_hold_indicator_active_ = false;
         }
+        duplicate_filter_.reset();
+        last_button_seq_ = 0;
+        has_controller_uptime_ = false;
         return;
+    }
+
+    /* 2b. Prolonged idle silence resync:
+     * If receiver is in safe idle and has seen no radio activity for > 5000ms,
+     * any in-flight packets are long dead. Reset sequence windows to cleanly accept
+     * any reconnecting controller. */
+    if (current_state_ == protocol::RECV_STATE_SAFE_IDLE &&
+        current_time_ms - last_activity_ms_ >= 5000) {
+        duplicate_filter_.reset();
+        last_button_seq_ = 0;
+        has_cached_ack_ = false;
     }
 
     /* 2. Effect Active -> Cooldown transition */
@@ -313,11 +331,23 @@ protocol::StatusCode ReceiverStateMachine::handle_effect_stop(
 
 void ReceiverStateMachine::handle_ping(
     uint16_t seq,
-    const protocol::PingMsg& /*ping*/,
+    const protocol::PingMsg& ping,
     uint32_t current_time_ms,
     protocol::PongMsg* out_pong
 ) {
     (void)seq;
+    // Controller reboot detection:
+    // If controller uptime decreased significantly, the controller rebooted!
+    // Reset deduplication filter and button sequence so the controller's new session is accepted immediately.
+    if (has_controller_uptime_ && ping.uptime_ms < last_controller_uptime_ms_) {
+        duplicate_filter_.reset();
+        last_button_seq_ = 0;
+        button_hold_indicator_active_ = false;
+        has_cached_ack_ = false;
+    }
+    last_controller_uptime_ms_ = ping.uptime_ms;
+    has_controller_uptime_ = true;
+
     if (out_pong != NULL) {
         out_pong->uptime_ms = current_time_ms;
         out_pong->receiver_state = current_state_;
@@ -369,7 +399,7 @@ protocol::StatusCode ReceiverStateMachine::handle_button_event(
         return protocol::STATUS_ERR_DUPLICATE;
     } else if (type == protocol::MSG_TYPE_BUTTON_UP) {
         int16_t diff = (int16_t)(seq - last_button_seq_);
-        if (diff >= 0 || last_button_seq_ == 0) {
+        if (diff >= 0 || last_button_seq_ == 0 || !button_hold_indicator_active_) {
             button_hold_indicator_active_ = false;
             last_button_seq_ = seq;
             return protocol::STATUS_OK;

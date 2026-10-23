@@ -58,8 +58,8 @@ bool ControllerRadio::begin() {
     WiFi.mode(WIFI_STA);
     WiFi.disconnect();
 
-    // Enable Wi-Fi modem sleep so RF receiver sleeps when idle
-    esp_wifi_set_ps(WIFI_PS_MIN_MODEM);
+    // ESP-NOW requires continuous RX listening without AP beacons
+    esp_wifi_set_ps(WIFI_PS_NONE);
 
     // Limit Wi-Fi TX power to +11 dBm (~13 mW) to prevent battery voltage sag
     // and reduce peak transmission current by ~50%

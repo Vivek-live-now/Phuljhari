@@ -89,6 +89,7 @@ public:
     /* Outgoing Action Dispatch Queue */
     bool has_pending_action() const { return action_pending_; }
     OutgoingAction pop_pending_action();
+    void send_initial_ping(uint32_t current_time_ms);
 
     /* Incoming Radio Packet Ingestion */
     protocol::StatusCode process_incoming_packet(

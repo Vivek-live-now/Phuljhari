@@ -132,6 +132,10 @@ private:
 
     protocol::DuplicateFilter duplicate_filter_;
 
+    /* Controller uptime tracking for reboot detection */
+    uint32_t last_controller_uptime_ms_;
+    bool has_controller_uptime_;
+
     /* Cached ACK for idempotent retransmission */
     bool has_cached_ack_;
     protocol::EffectAck cached_ack_;
