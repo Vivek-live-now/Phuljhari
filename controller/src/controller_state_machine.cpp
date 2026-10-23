@@ -10,7 +10,8 @@ namespace phuljhari {
 namespace controller {
 
 ControllerStateMachine::ControllerStateMachine()
-    : selected_character_(CHAR_PHULJHARI),
+    : shutdown_requested_(false),
+      selected_character_(CHAR_PHULJHARI),
       anim_state_(CHAR_STATE_IDLE),
       anim_start_ms_(0),
       anim_duration_ms_(3500),
@@ -39,6 +40,7 @@ ControllerStateMachine::ControllerStateMachine()
 }
 
 void ControllerStateMachine::init(uint32_t current_time_ms) {
+    shutdown_requested_ = false;
     selected_character_ = CHAR_PHULJHARI;
     anim_state_ = CHAR_STATE_IDLE;
     anim_start_ms_ = 0;
@@ -161,7 +163,7 @@ void ControllerStateMachine::toggle_settings() {
 }
 
 void ControllerStateMachine::settings_next_item() {
-    settings_cursor_ = (settings_cursor_ + 1) % 10;
+    settings_cursor_ = (settings_cursor_ + 1) % PHULJHARI_SETTINGS_ROW_COUNT;
     sound_mgr_.play_ui_click(anim_start_ms_);
 }
 
@@ -187,31 +189,40 @@ void ControllerStateMachine::settings_toggle_current() {
             sound_mgr_.set_volume(s.volume_percent);
             break;
 
-        case 3: // Tilt ON / OFF
+        case 3: // Brightness LOW -> MED -> HIGH -> LOW
+            s.brightness_level = (BrightnessLevel)((s.brightness_level + 1) % BRIGHT_COUNT);
+            break;
+
+        case 4: // Tilt ON / OFF
             s.tilt_enabled = !s.tilt_enabled;
             break;
 
-        case 4: // Flick ON / OFF
+        case 5: // Flick ON / OFF
             s.flick_enabled = !s.flick_enabled;
             break;
 
-        case 5: // Flick Sensitivity
+        case 6: // Flick Sensitivity
             s.flick_sensitivity = (FlickSensitivity)((s.flick_sensitivity + 1) % FLICK_SENS_COUNT);
             break;
 
-        case 6: // Power Save Mode
+        case 7: // Power Save Mode
             s.power_save_mode = !s.power_save_mode;
             break;
 
-        case 7: // Background Theme
+        case 8: // Background Theme
             s.background_theme = (BackgroundTheme)((s.background_theme + 1) % BG_THEME_COUNT);
             break;
 
-        case 8: // Rangoli Floor Art Layer
+        case 9: // Rangoli Floor Art Layer
             s.rangoli_enabled = !s.rangoli_enabled;
             break;
 
-        case 9: // [ < BACK TO FESTIVAL ]
+        case 10: // [ POWER OFF ]
+            shutdown_requested_ = true;
+            exit_settings();
+            return;
+
+        case 11: // [ < BACK TO FESTIVAL ]
             exit_settings();
             return;
 

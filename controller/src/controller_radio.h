@@ -28,6 +28,8 @@ public:
     ControllerRadio();
 
     bool begin();
+    void set_wireless_enabled(bool enabled);
+    bool is_enabled() const { return enabled_; }
 
     /**
      * @brief Processes pending outgoing actions from state machine and drains incoming packets.
@@ -46,6 +48,7 @@ private:
     volatile uint8_t rx_tail_;
 
     uint8_t broadcast_mac_[6];
+    bool enabled_;
 };
 
 } // namespace controller

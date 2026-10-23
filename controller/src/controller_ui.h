@@ -28,6 +28,11 @@ public:
     void show_startup_animation(uint32_t duration_ms);
     void render(ControllerStateMachine& csm, uint32_t current_time_ms);
 
+    uint32_t get_last_render_ms() const { return last_render_ms_; }
+    void notify_user_activity(uint32_t current_time_ms);
+    bool is_display_blanked() const { return display_blanked_; }
+    void shutdown_power_off();
+
 private:
 #if defined(ARDUINO)
     void render_festival_screen(ControllerStateMachine& csm, uint32_t current_time_ms);
@@ -40,6 +45,10 @@ private:
     AnimCharacterEngine anim_engine_;
 #endif
     uint32_t last_render_ms_;
+    uint32_t last_activity_time_ms_;
+    uint8_t current_brightness_;
+    bool display_dimmed_;
+    bool display_blanked_;
 };
 
 } // namespace controller

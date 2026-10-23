@@ -37,8 +37,44 @@
 /** Wi-Fi Channel (must match Receiver). */
 #define PHULJHARI_RADIO_CHANNEL          1
 
-/** Heartbeat ping interval when idle (milliseconds). */
+/** Heartbeat ping interval when idle & connected (milliseconds). */
 #define PHULJHARI_PING_INTERVAL_MS       2000
+
+/** Heartbeat ping interval when receiver is offline (milliseconds, saves battery). */
+#define PHULJHARI_OFFLINE_PING_INTERVAL_MS 5000
+
+/* -------------------------------------------------------------------------
+ * Power Management, Frequency Scaling & Inactivity Timings
+ * ------------------------------------------------------------------------- */
+/** Target CPU frequency in normal mode (160 MHz saves ~35% dynamic power vs 240 MHz). */
+#define PHULJHARI_CPU_FREQ_NORMAL_MHZ    160
+
+/** Target CPU frequency in power-save mode (80 MHz saves ~55% dynamic power vs 240 MHz). */
+#define PHULJHARI_CPU_FREQ_POWER_SAVE_MHZ 80
+
+/** Wi-Fi TX Power limit in dBm (11 dBm saves ~50% peak TX surge vs 20 dBm). */
+#define PHULJHARI_WIFI_TX_POWER_DBM      11
+
+/** Inactivity duration before dimming screen to save power (milliseconds). */
+#define PHULJHARI_INACTIVITY_DIM_MS      30000
+
+/** Backlight level when screen is auto-dimmed (low power). */
+#define PHULJHARI_BRIGHTNESS_DIM         15
+
+/** Inactivity duration before blanking screen backlight (milliseconds). */
+#define PHULJHARI_INACTIVITY_BLANK_MS    90000
+
+/** Inactivity duration before automatic hardware power-off via PMIC (milliseconds). */
+#define PHULJHARI_AUTO_POWER_OFF_MS      300000
+
+/** Loop sleep time in milliseconds during active rendering (allows FreeRTOS idle sleep). */
+#define PHULJHARI_LOOP_SLEEP_MS          5
+
+/** Loop sleep time in milliseconds when screen is blanked. */
+#define PHULJHARI_BLANKED_SLEEP_MS       20
+
+/** Total number of rows in the Settings menu. */
+#define PHULJHARI_SETTINGS_ROW_COUNT     12
 
 /** Time after last RX before transitioning to LINK_RECONNECTING (milliseconds). */
 #define PHULJHARI_RECONNECT_TIMEOUT_MS   3500

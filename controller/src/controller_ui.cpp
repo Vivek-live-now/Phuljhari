@@ -15,9 +15,17 @@ namespace controller {
 ControllerUi::ControllerUi()
 #if defined(ARDUINO)
     : canvas_(&M5.Display),
-      last_render_ms_(0)
+      last_render_ms_(0),
+      last_activity_time_ms_(0),
+      current_brightness_(75),
+      display_dimmed_(false),
+      display_blanked_(false)
 #else
-    : last_render_ms_(0)
+    : last_render_ms_(0),
+      last_activity_time_ms_(0),
+      current_brightness_(75),
+      display_dimmed_(false),
+      display_blanked_(false)
 #endif
 {}
 
@@ -26,7 +34,8 @@ bool ControllerUi::begin() {
     Serial.println("[UI] Initializing Portrait M5StickS3 display (135x240)...");
 
     M5.Display.setRotation(PHULJHARI_DISP_ROTATION); // 0 = Portrait
-    M5.Display.setBrightness(128);
+    current_brightness_ = 75; // Balanced default (~30% brightness, cuts backlight drain)
+    M5.Display.setBrightness(current_brightness_);
 
     canvas_.setColorDepth(16);
     void* buffer = canvas_.createSprite(PHULJHARI_DISP_WIDTH, PHULJHARI_DISP_HEIGHT);
@@ -36,11 +45,44 @@ bool ControllerUi::begin() {
     }
 
     anim_engine_.init();
+    last_activity_time_ms_ = millis();
+    display_dimmed_ = false;
+    display_blanked_ = false;
+
     Serial.printf("[UI] Double-buffered portrait canvas allocated (%dx%d, 16-bit).\n",
                   PHULJHARI_DISP_WIDTH, PHULJHARI_DISP_HEIGHT);
     return true;
 #else
     return true;
+#endif
+}
+
+void ControllerUi::notify_user_activity(uint32_t current_time_ms) {
+    last_activity_time_ms_ = current_time_ms;
+#if defined(ARDUINO)
+    if (display_blanked_ || display_dimmed_) {
+        display_blanked_ = false;
+        display_dimmed_ = false;
+        M5.Display.setBrightness(current_brightness_);
+    }
+#endif
+}
+
+void ControllerUi::shutdown_power_off() {
+#if defined(ARDUINO)
+    Serial.println("[UI] Powering off M5StickS3...");
+    canvas_.fillScreen(TFT_BLACK);
+    canvas_.setTextDatum(middle_center);
+    canvas_.setTextSize(1);
+    canvas_.setTextColor(0xFEA0);
+    canvas_.drawString("✦ SHUTTING DOWN ✦", PHULJHARI_DISP_WIDTH / 2, PHULJHARI_DISP_HEIGHT / 2 - 12);
+    canvas_.setTextColor(TFT_WHITE);
+    canvas_.drawString("GOODBYE! ✨", PHULJHARI_DISP_WIDTH / 2, PHULJHARI_DISP_HEIGHT / 2 + 8);
+    canvas_.pushSprite(0, 0);
+    delay(500);
+    M5.Display.setBrightness(0);
+    delay(100);
+    M5.Power.powerOff();
 #endif
 }
 
@@ -60,6 +102,50 @@ void ControllerUi::show_startup_animation(uint32_t duration_ms) {
 
 void ControllerUi::render(ControllerStateMachine& csm, uint32_t current_time_ms) {
 #if defined(ARDUINO)
+    // Synchronize display brightness with settings
+    uint8_t target_brightness = csm.get_settings().get_brightness_value();
+    if (current_brightness_ != target_brightness) {
+        current_brightness_ = target_brightness;
+        if (!display_dimmed_ && !display_blanked_) {
+            M5.Display.setBrightness(current_brightness_);
+        }
+    }
+
+    // Keep active during playing animations
+    if (csm.get_anim_state() == CHAR_STATE_PLAYING) {
+        last_activity_time_ms_ = current_time_ms;
+    }
+
+    // Check inactivity timeouts (dim -> blank -> auto-off)
+    uint32_t inactive_ms = current_time_ms - last_activity_time_ms_;
+    if (inactive_ms >= PHULJHARI_AUTO_POWER_OFF_MS) {
+        shutdown_power_off();
+        return;
+    } else if (inactive_ms >= PHULJHARI_INACTIVITY_BLANK_MS) {
+        if (!display_blanked_) {
+            display_blanked_ = true;
+            M5.Display.setBrightness(0);
+        }
+    } else if (inactive_ms >= PHULJHARI_INACTIVITY_DIM_MS) {
+        if (!display_dimmed_) {
+            display_dimmed_ = true;
+            uint8_t dimmed = PHULJHARI_BRIGHTNESS_DIM;
+            if (dimmed > current_brightness_) dimmed = current_brightness_;
+            M5.Display.setBrightness(dimmed);
+        }
+    } else {
+        if (display_dimmed_ || display_blanked_) {
+            display_dimmed_ = false;
+            display_blanked_ = false;
+            M5.Display.setBrightness(current_brightness_);
+        }
+    }
+
+    // If screen is blanked, skip heavy rendering and SPI transfer entirely
+    if (display_blanked_) {
+        return;
+    }
+
     uint32_t frame_interval = csm.get_settings().power_save_mode
                                   ? PHULJHARI_UI_POWER_SAVE_INTERVAL_MS
                                   : PHULJHARI_UI_FRAME_INTERVAL_MS;
@@ -243,13 +329,14 @@ void ControllerUi::render_settings_screen(ControllerStateMachine& csm, uint32_t 
 
     static const char* THEME_NAMES[] = { "ROOFTOP", "COURTYARD", "BAZAAR" };
     static const char* SENS_NAMES[]  = { "LOW", "MED", "HIGH" };
+    static const char* BRIGHT_NAMES[] = { "LOW", "MED", "HIGH" };
 
     struct SettingItemView {
         const char* label;
         char value[16];
     };
 
-    SettingItemView items[10];
+    SettingItemView items[PHULJHARI_SETTINGS_ROW_COUNT];
     items[0].label = "Wireless";
     snprintf(items[0].value, 16, "%s", s.wireless_enabled ? "ON" : "OFF");
 
@@ -259,49 +346,62 @@ void ControllerUi::render_settings_screen(ControllerStateMachine& csm, uint32_t 
     items[2].label = "Volume";
     snprintf(items[2].value, 16, "%d%%", s.volume_percent);
 
-    items[3].label = "Motion Tilt";
-    snprintf(items[3].value, 16, "%s", s.tilt_enabled ? "ON" : "OFF");
+    items[3].label = "Brightness";
+    snprintf(items[3].value, 16, "%s", BRIGHT_NAMES[s.brightness_level % BRIGHT_COUNT]);
 
-    items[4].label = "Flick-Start";
-    snprintf(items[4].value, 16, "%s", s.flick_enabled ? "ON" : "OFF");
+    items[4].label = "Motion Tilt";
+    snprintf(items[4].value, 16, "%s", s.tilt_enabled ? "ON" : "OFF");
 
-    items[5].label = "Flick Sens";
-    snprintf(items[5].value, 16, "%s", SENS_NAMES[s.flick_sensitivity % 3]);
+    items[5].label = "Flick-Start";
+    snprintf(items[5].value, 16, "%s", s.flick_enabled ? "ON" : "OFF");
 
-    items[6].label = "Power Save";
-    snprintf(items[6].value, 16, "%s", s.power_save_mode ? "ON" : "OFF");
+    items[6].label = "Flick Sens";
+    snprintf(items[6].value, 16, "%s", SENS_NAMES[s.flick_sensitivity % FLICK_SENS_COUNT]);
 
-    items[7].label = "Theme";
-    snprintf(items[7].value, 16, "%s", THEME_NAMES[s.background_theme % 3]);
+    items[7].label = "Power Save";
+    snprintf(items[7].value, 16, "%s", s.power_save_mode ? "ON" : "OFF");
 
-    items[8].label = "Rangoli";
-    snprintf(items[8].value, 16, "%s", s.rangoli_enabled ? "ON" : "OFF");
+    items[8].label = "Theme";
+    snprintf(items[8].value, 16, "%s", THEME_NAMES[s.background_theme % BG_THEME_COUNT]);
 
-    items[9].label = "[ < BACK ]";
-    items[9].value[0] = '\0';
+    items[9].label = "Rangoli";
+    snprintf(items[9].value, 16, "%s", s.rangoli_enabled ? "ON" : "OFF");
 
-    // Render list of 10 items
-    int start_y = 28;
-    int line_h = 18;
+    items[10].label = "[ POWER OFF ]";
+    items[10].value[0] = '\0';
 
-    for (int i = 0; i < 10; ++i) {
+    items[11].label = "[ < BACK ]";
+    items[11].value[0] = '\0';
+
+    // Render list of 12 items
+    int start_y = 24;
+    int line_h = 16;
+
+    for (int i = 0; i < PHULJHARI_SETTINGS_ROW_COUNT; ++i) {
         int y = start_y + i * line_h;
         bool is_cur = (i == cursor);
 
         if (is_cur) {
-            canvas_.fillRect(2, y - 2, PHULJHARI_DISP_WIDTH - 4, line_h - 1, 0x3186);
-            canvas_.drawRect(2, y - 2, PHULJHARI_DISP_WIDTH - 4, line_h - 1, 0xFEA0);
+            uint16_t box_color = (i == 10) ? 0x8800 : 0x3186;
+            uint16_t border_color = (i == 10) ? 0xF800 : 0xFEA0;
+            canvas_.fillRect(2, y - 1, PHULJHARI_DISP_WIDTH - 4, line_h - 1, box_color);
+            canvas_.drawRect(2, y - 1, PHULJHARI_DISP_WIDTH - 4, line_h - 1, border_color);
         }
 
         canvas_.setTextSize(1);
-        canvas_.setTextDatum(middle_left);
-        canvas_.setTextColor(is_cur ? 0xFEA0 : 0xFFDF);
 
-        char row_buf[32];
-        if (i == 9) {
+        if (i == 10) {
             canvas_.setTextDatum(middle_center);
+            canvas_.setTextColor(is_cur ? 0xF800 : 0xFA20);
+            canvas_.drawString("[ POWER OFF ]", PHULJHARI_DISP_WIDTH / 2, y + 6);
+        } else if (i == 11) {
+            canvas_.setTextDatum(middle_center);
+            canvas_.setTextColor(is_cur ? 0xFEA0 : 0xFFDF);
             canvas_.drawString("[ < BACK TO STAGE ]", PHULJHARI_DISP_WIDTH / 2, y + 6);
         } else {
+            canvas_.setTextDatum(middle_left);
+            canvas_.setTextColor(is_cur ? 0xFEA0 : 0xFFDF);
+            char row_buf[32];
             snprintf(row_buf, sizeof(row_buf), "%s%s", is_cur ? "> " : "  ", items[i].label);
             canvas_.drawString(row_buf, 4, y + 6);
 

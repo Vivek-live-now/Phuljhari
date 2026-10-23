@@ -115,11 +115,14 @@ public:
     bool is_ack_toast_active(uint32_t current_time_ms) const;
     bool is_command_pending() const { return has_pending_cmd_; }
     uint8_t get_pending_retries_left() const { return retries_left_; }
+    bool is_shutdown_requested() const { return shutdown_requested_; }
+    void clear_shutdown_request() { shutdown_requested_ = false; }
 
 private:
     void queue_action(const OutgoingAction& action);
     void dispatch_wireless_command(uint32_t current_time_ms);
 
+    bool shutdown_requested_;
     CharacterId selected_character_;
     AnimationState anim_state_;
     uint32_t anim_start_ms_;

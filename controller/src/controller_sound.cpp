@@ -28,6 +28,9 @@ bool ControllerSoundManager::begin() {
 #if defined(ARDUINO)
     uint8_t hw_vol = (uint8_t)(((uint32_t)volume_percent_ * 255U) / 100U);
     M5.Speaker.setVolume(enabled_ ? hw_vol : 0);
+    // Put audio amplifier into low-power standby on startup until audio is triggered
+    M5.Speaker.stop();
+    M5.Speaker.end();
 #endif
     return true;
 }
@@ -62,6 +65,8 @@ void ControllerSoundManager::stop() {
     current_step_idx_ = 0;
 #if defined(ARDUINO)
     M5.Speaker.stop();
+    // Power down amplifier to eliminate 15-30 mA idle quiescent current
+    M5.Speaker.end();
 #endif
 }
 
@@ -171,6 +176,9 @@ void ControllerSoundManager::start_step(size_t step_idx, uint32_t current_time_m
     playing_ = true;
 
 #if defined(ARDUINO)
+    if (step_idx == 0) {
+        M5.Speaker.begin();
+    }
     uint8_t hw_vol = (uint8_t)(((uint32_t)volume_percent_ * 255U) / 100U);
     M5.Speaker.setVolume(hw_vol);
     M5.Speaker.tone(active_steps_[step_idx].freq_hz, active_steps_[step_idx].duration_ms);

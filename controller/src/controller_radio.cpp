@@ -45,7 +45,8 @@ static void ctrl_espnow_send_cb(const uint8_t *mac_addr, esp_now_send_status_t s
 
 ControllerRadio::ControllerRadio()
     : rx_head_(0),
-      rx_tail_(0) {
+      rx_tail_(0),
+      enabled_(true) {
     s_ctrl_radio = this;
     std::memset(broadcast_mac_, 0xFF, 6);
     std::memset(rx_queue_, 0, sizeof(rx_queue_));
@@ -56,6 +57,13 @@ bool ControllerRadio::begin() {
 
     WiFi.mode(WIFI_STA);
     WiFi.disconnect();
+
+    // Enable Wi-Fi modem sleep so RF receiver sleeps when idle
+    esp_wifi_set_ps(WIFI_PS_MIN_MODEM);
+
+    // Limit Wi-Fi TX power to +11 dBm (~13 mW) to prevent battery voltage sag
+    // and reduce peak transmission current by ~50%
+    WiFi.setTxPower(WIFI_POWER_11dBm);
 
     esp_err_t err = esp_wifi_set_promiscuous(true);
     if (err == ESP_OK) {
@@ -82,8 +90,22 @@ bool ControllerRadio::begin() {
         esp_now_add_peer(&peerInfo);
     }
 
-    Serial.println("[RADIO] Controller ESP-NOW ready.");
+    enabled_ = true;
+    Serial.println("[RADIO] Controller ESP-NOW ready (Modem-Sleep + 11dBm TX).");
     return true;
+}
+
+void ControllerRadio::set_wireless_enabled(bool enabled) {
+    if (enabled_ == enabled) return;
+    enabled_ = enabled;
+    if (!enabled_) {
+        esp_now_deinit();
+        WiFi.mode(WIFI_OFF);
+        Serial.println("[RADIO] Wi-Fi powered OFF for low-power operation.");
+    } else {
+        begin();
+        Serial.println("[RADIO] Wi-Fi restored.");
+    }
 }
 
 void ControllerRadio::enqueue_rx_packet(const uint8_t* sender_mac, const uint8_t* data, size_t len) {

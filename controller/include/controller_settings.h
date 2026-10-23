@@ -29,10 +29,18 @@ enum FlickSensitivity : uint8_t {
     FLICK_SENS_COUNT= 3
 };
 
+enum BrightnessLevel : uint8_t {
+    BRIGHT_LOW  = 0, /**< 40  (~16% brightness, indoor battery saver) */
+    BRIGHT_MED  = 1, /**< 75  (~30% brightness, vibrant & balanced) */
+    BRIGHT_HIGH = 2, /**< 120 (~47% brightness, high ambient light) */
+    BRIGHT_COUNT= 3
+};
+
 struct ControllerSettings {
     bool wireless_enabled;
     bool sound_enabled;
     uint8_t volume_percent;         /**< 0 to 100 in steps of 25 */
+    BrightnessLevel brightness_level;
     bool tilt_enabled;
     bool flick_enabled;
     FlickSensitivity flick_sensitivity;
@@ -46,6 +54,7 @@ struct ControllerSettings {
         s.wireless_enabled  = true;
         s.sound_enabled     = true;
         s.volume_percent    = 75;
+        s.brightness_level  = BRIGHT_MED;
         s.tilt_enabled      = true;
         s.flick_enabled     = true;
         s.flick_sensitivity = FLICK_SENS_MED;
@@ -61,6 +70,7 @@ struct ControllerSettings {
         sum ^= (wireless_enabled ? 0x01 : 0x00);
         sum ^= (sound_enabled ? 0x02 : 0x00);
         sum ^= volume_percent;
+        sum ^= ((uint8_t)brightness_level << 1);
         sum ^= (tilt_enabled ? 0x04 : 0x00);
         sum ^= (flick_enabled ? 0x08 : 0x00);
         sum ^= ((uint8_t)flick_sensitivity << 4);
@@ -72,9 +82,20 @@ struct ControllerSettings {
 
     bool is_valid() const {
         if (volume_percent > 100) return false;
+        if (brightness_level >= BRIGHT_COUNT) return false;
         if (flick_sensitivity >= FLICK_SENS_COUNT) return false;
         if (background_theme >= BG_THEME_COUNT) return false;
         return (checksum == compute_checksum());
+    }
+
+    uint8_t get_brightness_value() const {
+        if (power_save_mode) return 40;
+        switch (brightness_level) {
+            case BRIGHT_LOW:  return 40;
+            case BRIGHT_HIGH: return 120;
+            case BRIGHT_MED:
+            default:          return 75;
+        }
     }
 
     float get_flick_threshold_g() const {

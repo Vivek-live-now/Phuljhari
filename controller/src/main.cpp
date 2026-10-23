@@ -30,10 +30,15 @@ void setup() {
     Serial.begin(115200);
     delay(100);
 
+    // Dynamic frequency scaling: set initial CPU clock to 160 MHz (normal mode)
+    setCpuFrequencyMhz(PHULJHARI_CPU_FREQ_NORMAL_MHZ);
+
     Serial.println("\n========================================================");
     Serial.println(" Project Phuljhari 2.0 ✨ Pocket Diwali Festival");
     Serial.println(" Tiny sparks. Wireless smiles.");
     Serial.println(" Hardware: M5StickS3 | Orientation: Portrait (135x240)");
+    Serial.printf (" Power Profile: CPU @ %u MHz, Wi-Fi TX @ %d dBm\n",
+                   getCpuFrequencyMhz(), PHULJHARI_WIFI_TX_POWER_DBM);
     Serial.println("========================================================");
 
     uint32_t start_ms = millis();
@@ -59,10 +64,38 @@ void setup() {
 void loop() {
     uint32_t now = millis();
 
-    // 1. Update M5 hardware states (buttons, battery, display)
+    // 0. Check if user requested soft power-off from Settings menu
+    if (s_csm.is_shutdown_requested()) {
+        s_ui.shutdown_power_off();
+    }
+
+    // 1. Dynamic CPU frequency scaling based on Power Save setting
+    static bool s_last_power_save = false;
+    bool cur_power_save = s_csm.get_settings().power_save_mode;
+    if (cur_power_save != s_last_power_save) {
+        s_last_power_save = cur_power_save;
+        uint32_t target_freq = cur_power_save ? PHULJHARI_CPU_FREQ_POWER_SAVE_MHZ : PHULJHARI_CPU_FREQ_NORMAL_MHZ;
+        setCpuFrequencyMhz(target_freq);
+        Serial.printf("[PWR] CPU Frequency scaled to %u MHz (power_save=%d).\n", target_freq, cur_power_save);
+    }
+
+    // 2. Synchronize radio hardware state if wireless toggled
+    static bool s_last_wireless = true;
+    bool cur_wireless = s_csm.get_settings().wireless_enabled;
+    if (cur_wireless != s_last_wireless) {
+        s_last_wireless = cur_wireless;
+        s_radio.set_wireless_enabled(cur_wireless);
+    }
+
+    // 3. Update M5 hardware states (buttons, battery, display)
     M5.update();
 
-    // 2. Physical Button B (Side Button):
+    // Notify user activity on any button event (resets inactivity timer & wakes blanked screen)
+    if (M5.BtnA.wasPressed() || M5.BtnA.wasReleased() || M5.BtnB.wasPressed() || M5.BtnB.wasReleased()) {
+        s_ui.notify_user_activity(now);
+    }
+
+    // 4. Physical Button B (Side Button):
     // - In Festival Stage: Click = Cycle Character, Hold (> 600ms) = Enter Settings
     // - In Settings Screen: Click = Next Item, Hold = Back to Festival
     if (s_csm.get_screen_mode() == SCREEN_SETTINGS) {
@@ -79,7 +112,7 @@ void loop() {
         }
     }
 
-    // 3. Physical Button A (Front Thumb Button):
+    // 5. Physical Button A (Front Thumb Button):
     // - In Festival Stage: Press = Hold Sync Start, Release = Hold Sync End (Short tap = Celebrate)
     // - In Settings Screen: Click = Toggle / Adjust Selected Setting
     if (s_csm.get_screen_mode() == SCREEN_SETTINGS) {
@@ -95,18 +128,21 @@ void loop() {
         }
     }
 
-    // 4. Update IMU motion & deliberate flick-to-start gesture detection
+    // 6. Update IMU motion & deliberate flick-to-start gesture detection
     s_imu.update(s_csm, now);
 
-    // 5. Advance controller state machine (lifecycle, retries, sound sequencer)
+    // 7. Advance controller state machine (lifecycle, retries, sound sequencer)
     s_csm.tick(now);
 
-    // 6. Pump radio queue (broadcast outgoing actions, receive ACKs)
+    // 8. Pump radio queue (broadcast outgoing actions, receive ACKs)
     s_radio.update(s_csm, now);
 
-    // 7. Render UI frame onto double-buffered canvas (non-blocking rate limiter)
+    // 9. Render UI frame onto double-buffered canvas (non-blocking rate limiter)
     s_ui.render(s_csm, now);
 
-    // Yield to FreeRTOS background scheduler
-    yield();
+    // 10. Low-power tickless sleep: allows FreeRTOS idle task to put ESP32-S3 into
+    // light wait-for-interrupt (waiti 0) state instead of 100% busy looping.
+    // When screen is blanked, sleep longer to maximize battery life.
+    uint32_t sleep_ms = s_ui.is_display_blanked() ? PHULJHARI_BLANKED_SLEEP_MS : PHULJHARI_LOOP_SLEEP_MS;
+    delay(sleep_ms);
 }
