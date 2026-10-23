@@ -11,6 +11,7 @@
 #include <M5Unified.h>
 
 #include "controller_config.h"
+#include "controller_imu_math.h"
 #include "controller_state_machine.h"
 
 namespace phuljhari {
@@ -27,8 +28,9 @@ public:
     bool begin();
 
     /**
-     * @brief Reads accelerometer and gyroscope, applies EMA filtering and dead-zones,
-     *        and detects deliberate wrist gestures.
+     * @brief Reads accelerometer, applies EMA filtering, dead-zones, and clamped rotation,
+     *        and updates the visual tilt state in CSM.
+     *        Does NOT select crackers. Does NOT send effect commands.
      * @param csm Reference to controller state machine.
      * @param current_time_ms Current timestamp.
      */
@@ -37,6 +39,8 @@ public:
     float get_accel_x() const { return filtered_ax_; }
     float get_accel_y() const { return filtered_ay_; }
     float get_accel_z() const { return filtered_az_; }
+    float get_tilt_norm() const { return filtered_tilt_norm_; }
+    float get_tilt_angle_rad() const { return tilt_angle_rad_; }
     bool is_available() const { return imu_available_; }
 
 private:
@@ -47,14 +51,11 @@ private:
     float filtered_ay_;
     float filtered_az_;
 
-    /* Gyroscope states (deg/s) */
-    float gyro_gx_;
-    float gyro_gy_;
-    float gyro_gz_;
+    /* Smoothed visual tilt states */
+    float filtered_tilt_norm_;
+    float tilt_angle_rad_;
 
-    /* Gesture debounce & cooldown timers */
-    uint32_t last_tilt_gesture_ms_;
-    uint32_t last_flick_gesture_ms_;
+    uint32_t last_flick_telemetry_ms_;
 };
 
 } // namespace controller

@@ -63,13 +63,8 @@ private:
     void render_patakha(uint8_t brightness);
     void render_safe_idle();
 
-    /* Bench-test Onboard LED Renderer */
-    void update_onboard_led(
-        protocol::ReceiverState state,
-        protocol::EffectId effect,
-        bool button_indicator_active,
-        uint32_t current_time_ms
-    );
+    /* Bench-test Onboard LED Renderer (Strictly Button-Controlled) */
+    void update_onboard_led(bool button_indicator_active);
 
     uint32_t last_frame_ms_;
     uint32_t animation_step_;

@@ -19,6 +19,8 @@
 #include "phuljhari_safety.h"
 #include "phuljhari_protocol.h"
 #include "receiver_state_machine.h"
+#include "controller_config.h"
+#include "controller_imu_math.h"
 #include "controller_state_machine.h"
 
 using namespace phuljhari;
@@ -312,6 +314,186 @@ static bool test_independent_led_control_paths() {
 }
 
 /* -------------------------------------------------------------------------
+ * Acceptance Test 8: Strict GPIO 2 Exclusivity (Requirements 1-7)
+ * ------------------------------------------------------------------------- */
+static bool test_acceptance_gpio2_strictly_button_controlled() {
+    ReceiverStateMachine receiver;
+    receiver.init(1000);
+
+    uint8_t wire[PHULJHARI_MAX_FRAME_SIZE];
+    size_t wire_len = 0;
+    uint8_t resp[PHULJHARI_MAX_FRAME_SIZE];
+    size_t resp_len = 0;
+    bool has_resp = false;
+
+    // Req 1: GPIO 2 remains OFF at startup and during idle
+    ACC_ASSERT(!receiver.is_button_indicator_active(), "Req 1: GPIO 2 is OFF at startup");
+    receiver.tick(2000);
+    receiver.tick(3000);
+    ACC_ASSERT(!receiver.is_button_indicator_active(), "Req 1: GPIO 2 remains OFF during idle");
+
+    // Req 2: PING/PONG, status requests, and effect commands never change GPIO 2
+    PingMsg ping = { 1000 };
+    serialize_ping(1, &ping, wire, sizeof(wire), &wire_len);
+    receiver.process_incoming_packet(wire, wire_len, 3100, resp, sizeof(resp), &resp_len, &has_resp);
+    ACC_ASSERT(!receiver.is_button_indicator_active(), "Req 2: PING does not affect GPIO 2");
+
+    serialize_status_req(2, wire, sizeof(wire), &wire_len);
+    receiver.process_incoming_packet(wire, wire_len, 3200, resp, sizeof(resp), &resp_len, &has_resp);
+    ACC_ASSERT(!receiver.is_button_indicator_active(), "Req 2: STATUS_REQ does not affect GPIO 2");
+
+    EffectCmd cmd = { EFFECT_ID_PATAKHA, 2000, 70, 0 };
+    serialize_effect_cmd(3, &cmd, wire, sizeof(wire), &wire_len);
+    receiver.process_incoming_packet(wire, wire_len, 3300, resp, sizeof(resp), &resp_len, &has_resp);
+    ACC_ASSERT(receiver.is_output_active(), "WS2812B is active");
+    ACC_ASSERT(!receiver.is_button_indicator_active(), "Req 2: EFFECT_CMD does not affect GPIO 2");
+
+    // Req 3: A valid Button A press turns GPIO 2 ON
+    ButtonEventMsg btn = { 0, 0, 0 };
+    serialize_button_event(MSG_TYPE_BUTTON_DOWN, 10, &btn, wire, sizeof(wire), &wire_len);
+    StatusCode st = receiver.process_incoming_packet(wire, wire_len, 4000, resp, sizeof(resp), &resp_len, &has_resp);
+    ACC_ASSERT(st == STATUS_OK, "Valid BUTTON_DOWN processed");
+    ACC_ASSERT(receiver.is_button_indicator_active(), "Req 3: Valid Button A press turns GPIO 2 ON");
+
+    // Req 4: Valid hold-sync maintains the active hold
+    serialize_button_event(MSG_TYPE_BUTTON_SYNC, 11, &btn, wire, sizeof(wire), &wire_len);
+    st = receiver.process_incoming_packet(wire, wire_len, 4180, resp, sizeof(resp), &resp_len, &has_resp);
+    ACC_ASSERT(st == STATUS_OK, "Valid BUTTON_SYNC processed");
+    ACC_ASSERT(receiver.is_button_indicator_active(), "Req 4: Valid hold-sync maintains active hold");
+
+    // Req 5: Button release turns GPIO 2 OFF immediately
+    serialize_button_event(MSG_TYPE_BUTTON_UP, 12, &btn, wire, sizeof(wire), &wire_len);
+    st = receiver.process_incoming_packet(wire, wire_len, 4300, resp, sizeof(resp), &resp_len, &has_resp);
+    ACC_ASSERT(st == STATUS_OK, "Valid BUTTON_UP processed");
+    ACC_ASSERT(!receiver.is_button_indicator_active(), "Req 5: Button release turns GPIO 2 OFF immediately");
+
+    // Req 6: Missing hold-sync triggers failsafe timeout
+    serialize_button_event(MSG_TYPE_BUTTON_DOWN, 20, &btn, wire, sizeof(wire), &wire_len);
+    receiver.process_incoming_packet(wire, wire_len, 5000, resp, sizeof(resp), &resp_len, &has_resp);
+    ACC_ASSERT(receiver.is_button_indicator_active(), "Hold started at 5000ms");
+    receiver.tick(5599);
+    ACC_ASSERT(receiver.is_button_indicator_active(), "Still active before 600ms timeout");
+    receiver.tick(5601);
+    ACC_ASSERT(!receiver.is_button_indicator_active(), "Req 6: Missing hold-sync triggers 600ms failsafe timeout");
+
+    // Req 7: Invalid, duplicate, stale, and out-of-order packets cannot activate output or extend timeout
+    // Stale sync while inactive -> rejected
+    serialize_button_event(MSG_TYPE_BUTTON_SYNC, 25, &btn, wire, sizeof(wire), &wire_len);
+    st = receiver.process_incoming_packet(wire, wire_len, 6000, resp, sizeof(resp), &resp_len, &has_resp);
+    ACC_ASSERT(st == STATUS_ERR_DUPLICATE, "Stale sync rejected");
+    ACC_ASSERT(!receiver.is_button_indicator_active(), "Req 7: Stale sync cannot activate GPIO 2");
+
+    // Out-of-order BUTTON_DOWN (seq 15 < last seq 25)
+    serialize_button_event(MSG_TYPE_BUTTON_DOWN, 15, &btn, wire, sizeof(wire), &wire_len);
+    st = receiver.process_incoming_packet(wire, wire_len, 6100, resp, sizeof(resp), &resp_len, &has_resp);
+    ACC_ASSERT(st == STATUS_ERR_DUPLICATE, "Out-of-order down rejected");
+    ACC_ASSERT(!receiver.is_button_indicator_active(), "Req 7: Out-of-order down cannot activate GPIO 2");
+
+    // Start valid hold session seq 30 at 7000ms
+    serialize_button_event(MSG_TYPE_BUTTON_DOWN, 30, &btn, wire, sizeof(wire), &wire_len);
+    receiver.process_incoming_packet(wire, wire_len, 7000, resp, sizeof(resp), &resp_len, &has_resp);
+    ACC_ASSERT(receiver.is_button_indicator_active(), "Hold active seq 30");
+
+    // Duplicate seq 30 must not extend timeout
+    serialize_button_event(MSG_TYPE_BUTTON_SYNC, 30, &btn, wire, sizeof(wire), &wire_len);
+    st = receiver.process_incoming_packet(wire, wire_len, 7300, resp, sizeof(resp), &resp_len, &has_resp);
+    ACC_ASSERT(st == STATUS_ERR_DUPLICATE, "Duplicate seq rejected");
+
+    // If duplicate had extended timeout, it would expire at 7300 + 600 = 7900.
+    // Because it did NOT extend timeout, it must expire at 7000 + 600 = 7600!
+    receiver.tick(7601);
+    ACC_ASSERT(!receiver.is_button_indicator_active(), "Req 7: Duplicate sync did NOT extend timeout");
+
+    return true;
+}
+
+/* -------------------------------------------------------------------------
+ * Acceptance Test 9: IMU Subtle Visual Tilt & Cracker Isolation (Reqs 8-12)
+ * ------------------------------------------------------------------------- */
+static bool test_acceptance_imu_tilt_subtle_visual_only() {
+    ControllerStateMachine controller;
+    controller.init(1000);
+
+    // Initial state: Phuljhari selected
+    ACC_ASSERT(controller.get_selected_character() == EFFECT_ID_PHULJHARI, "Initial cracker Phuljhari");
+
+    // Req 8: IMU tilt changes visual rotation without changing selected cracker
+    float tilt = 0.0f;
+    // Apply moderate tilt G = 0.40 G
+    for (int i = 0; i < 20; ++i) {
+        tilt = ImuTiltMath::update_smooth_tilt(0.40f, tilt);
+    }
+    float rad = ImuTiltMath::tilt_to_rotation_rad(tilt);
+    controller.set_sim_tilt(tilt, rad);
+
+    ACC_ASSERT(controller.get_sim_tilt_x() > 0.3f, "Visual tilt updated");
+    ACC_ASSERT(controller.get_sim_tilt_y() > 0.1f && controller.get_sim_tilt_y() <= PHULJHARI_IMU_MAX_ROTATION_RAD,
+               "Rotation angle clamped");
+    ACC_ASSERT(controller.get_selected_character() == EFFECT_ID_PHULJHARI,
+               "Req 8: Tilting does NOT change selected cracker!");
+
+    // Req 9: Returning to neutral tilt smoothly restores neutral orientation
+    for (int i = 0; i < 35; ++i) {
+        tilt = ImuTiltMath::update_smooth_tilt(0.0f, tilt); // Device returned to level
+    }
+    rad = ImuTiltMath::tilt_to_rotation_rad(tilt);
+    controller.set_sim_tilt(tilt, rad);
+
+    ACC_ASSERT(controller.get_sim_tilt_x() == 0.0f, "Req 9: Neutral tilt restored to 0.0f");
+    ACC_ASSERT(controller.get_sim_tilt_y() == 0.0f, "Req 9: Neutral rotation angle restored to 0.0 rad");
+
+    // Req 10: Flicking or tilting does not select another cracker or transmit an effect command
+    controller.trigger_sim_virtual_burst(); // Flick simulator telemetry
+    controller.set_sim_tilt(0.9f, 0.32f);   // Extreme tilt reading
+    ACC_ASSERT(controller.get_selected_character() == EFFECT_ID_PHULJHARI,
+               "Req 10: Flicking or tilting does NOT change selected cracker!");
+    ACC_ASSERT(!controller.has_pending_action(),
+               "Req 10: Flicking or tilting does NOT transmit an effect command!");
+    ACC_ASSERT(controller.get_total_triggers() == 0,
+               "Req 10: Triggers count remains 0");
+
+    // Req 11: Button-based selection still works independently
+    controller.cycle_character_forward();
+    ACC_ASSERT(controller.get_selected_character() == EFFECT_ID_ANAR, "Req 11: Button cycles to Anar");
+    controller.cycle_character_forward();
+    ACC_ASSERT(controller.get_selected_character() == EFFECT_ID_PATAKHA, "Req 11: Button cycles to Patakha");
+    controller.cycle_character_forward();
+    ACC_ASSERT(controller.get_selected_character() == EFFECT_ID_PHULJHARI, "Req 11: Button cycles back to Phuljhari");
+
+    // Req 12: WS2812B effects and GPIO 2 remain independent
+    ReceiverStateMachine receiver;
+    receiver.init(1000);
+    // WS2812B effect running
+    EffectCmd cmd = { EFFECT_ID_PHULJHARI, 4000, 80, 0 };
+    EffectAck ack;
+    receiver.handle_effect_cmd(100, cmd, 1000, &ack);
+    ACC_ASSERT(receiver.is_output_active(), "WS2812B effect is running");
+    ACC_ASSERT(!receiver.is_button_indicator_active(), "Req 12: WS2812B running does NOT activate GPIO 2");
+
+    // Button down arrives during effect
+    ButtonEventMsg btn = { 0, 0, 0 };
+    uint8_t wire[PHULJHARI_MAX_FRAME_SIZE];
+    size_t wire_len = 0;
+    serialize_button_event(MSG_TYPE_BUTTON_DOWN, 101, &btn, wire, sizeof(wire), &wire_len);
+    uint8_t dummy[PHULJHARI_MAX_FRAME_SIZE];
+    size_t dlen = 0;
+    bool dresp = false;
+    receiver.process_incoming_packet(wire, wire_len, 1200, dummy, sizeof(dummy), &dlen, &dresp);
+    ACC_ASSERT(receiver.is_output_active(), "WS2812B effect still running");
+    ACC_ASSERT(receiver.is_button_indicator_active(), "Req 12: Button hold activates GPIO 2 without affecting strip");
+
+    // Effect finishes (advance to 5100ms)
+    receiver.tick(5100);
+    ACC_ASSERT(!receiver.is_output_active(), "WS2812B finished");
+    // Button release arrives
+    serialize_button_event(MSG_TYPE_BUTTON_UP, 102, &btn, wire, sizeof(wire), &wire_len);
+    receiver.process_incoming_packet(wire, wire_len, 5200, dummy, sizeof(dummy), &dlen, &dresp);
+    ACC_ASSERT(!receiver.is_button_indicator_active(), "Req 12: GPIO 2 turns OFF on release");
+
+    return true;
+}
+
+/* -------------------------------------------------------------------------
  * Main Acceptance Test Runner
  * ------------------------------------------------------------------------- */
 int main() {
@@ -326,6 +508,8 @@ int main() {
     RUN_ACC_TEST(test_rapid_button_press_cycles);
     RUN_ACC_TEST(test_button_release_recovery_failsafe);
     RUN_ACC_TEST(test_independent_led_control_paths);
+    RUN_ACC_TEST(test_acceptance_gpio2_strictly_button_controlled);
+    RUN_ACC_TEST(test_acceptance_imu_tilt_subtle_visual_only);
 
     std::cout << "====================================================\n";
     std::cout << "Acceptance Summary: " << g_acc_tests_passed << "/" << g_acc_tests_run << " passed";

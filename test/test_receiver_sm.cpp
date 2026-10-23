@@ -303,6 +303,75 @@ static bool test_sm_live_button_synchronization() {
 }
 
 /* -------------------------------------------------------------------------
+ * Test 9: Strict GPIO 2 Isolation from Non-Button Packets & Malformed Input
+ * ------------------------------------------------------------------------- */
+static bool test_sm_gpio2_strictly_button_only() {
+    ReceiverStateMachine sm;
+    sm.init(1000);
+
+    uint8_t wire[PHULJHARI_MAX_FRAME_SIZE];
+    size_t wire_len = 0;
+    uint8_t resp_buf[PHULJHARI_MAX_FRAME_SIZE];
+    size_t resp_len = 0;
+    bool has_resp = false;
+
+    // 1. Initial State: GPIO 2 must be OFF
+    SM_ASSERT(!sm.is_button_indicator_active(), "GPIO 2 must be OFF at startup");
+
+    // 2. Idle ticking: GPIO 2 remains OFF
+    sm.tick(1500);
+    sm.tick(2500);
+    SM_ASSERT(!sm.is_button_indicator_active(), "GPIO 2 must remain OFF during idle");
+
+    // 3. PING packets must never activate GPIO 2
+    PingMsg ping = { 1000 };
+    serialize_ping(1, &ping, wire, sizeof(wire), &wire_len);
+    sm.process_incoming_packet(wire, wire_len, 2500, resp_buf, sizeof(resp_buf), &resp_len, &has_resp);
+    SM_ASSERT(!sm.is_button_indicator_active(), "PING must never activate GPIO 2");
+
+    // 4. Status requests must never activate GPIO 2
+    serialize_status_req(2, wire, sizeof(wire), &wire_len);
+    sm.process_incoming_packet(wire, wire_len, 2600, resp_buf, sizeof(resp_buf), &resp_len, &has_resp);
+    SM_ASSERT(!sm.is_button_indicator_active(), "STATUS_REQ must never activate GPIO 2");
+
+    // 5. Effect commands (WS2812B strip) must never activate GPIO 2
+    EffectCmd cmd = { EFFECT_ID_PHULJHARI, 3000, 75, 0 };
+    serialize_effect_cmd(3, &cmd, wire, sizeof(wire), &wire_len);
+    sm.process_incoming_packet(wire, wire_len, 2700, resp_buf, sizeof(resp_buf), &resp_len, &has_resp);
+    SM_ASSERT(sm.is_output_active(), "Strip is active");
+    SM_ASSERT(!sm.is_button_indicator_active(), "EFFECT_CMD must NEVER activate GPIO 2");
+
+    // 6. Effect Stop must never activate GPIO 2
+    EffectStopMsg stop = { 0 };
+    serialize_effect_stop(4, &stop, wire, sizeof(wire), &wire_len);
+    sm.process_incoming_packet(wire, wire_len, 3000, resp_buf, sizeof(resp_buf), &resp_len, &has_resp);
+    SM_ASSERT(!sm.is_output_active(), "Strip stopped");
+    SM_ASSERT(!sm.is_button_indicator_active(), "EFFECT_STOP must not affect GPIO 2");
+
+    // 7. Stale / duplicate button events cannot activate or extend hold
+    // Out-of-order BUTTON_DOWN (seq 0 when last seq was 0 is ok, but seq 0 after seq 5 is rejected)
+    ButtonEventMsg btn = { 0, 0, 0 };
+    serialize_button_event(MSG_TYPE_BUTTON_DOWN, 5, &btn, wire, sizeof(wire), &wire_len);
+    sm.process_incoming_packet(wire, wire_len, 4000, resp_buf, sizeof(resp_buf), &resp_len, &has_resp);
+    SM_ASSERT(sm.is_button_indicator_active(), "Valid BUTTON_DOWN seq 5 activates hold");
+
+    // Duplicate BUTTON_DOWN (seq 5 again) must be rejected
+    StatusCode st = sm.process_incoming_packet(wire, wire_len, 4200, resp_buf, sizeof(resp_buf), &resp_len, &has_resp);
+    SM_ASSERT(st == STATUS_ERR_DUPLICATE, "Duplicate seq 5 must return duplicate error");
+
+    // Out-of-order BUTTON_SYNC (seq 4 < 5) must be rejected and not extend timeout
+    serialize_button_event(MSG_TYPE_BUTTON_SYNC, 4, &btn, wire, sizeof(wire), &wire_len);
+    st = sm.process_incoming_packet(wire, wire_len, 4300, resp_buf, sizeof(resp_buf), &resp_len, &has_resp);
+    SM_ASSERT(st == STATUS_ERR_DUPLICATE, "Out-of-order SYNC must be rejected");
+
+    // Advance to 4000 + 601 = 4601ms (timeout should occur because out-of-order sync didn't extend it)
+    sm.tick(4601);
+    SM_ASSERT(!sm.is_button_indicator_active(), "Hold timed out on schedule; out-of-order sync did not extend it");
+
+    return true;
+}
+
+/* -------------------------------------------------------------------------
  * Main SM Test Runner
  * ------------------------------------------------------------------------- */
 int main() {
@@ -318,6 +387,7 @@ int main() {
     RUN_SM_TEST(test_sm_watchdog_cutoff);
     RUN_SM_TEST(test_sm_wire_packet_processing);
     RUN_SM_TEST(test_sm_live_button_synchronization);
+    RUN_SM_TEST(test_sm_gpio2_strictly_button_only);
 
     std::cout << "====================================================\n";
     std::cout << "Receiver SM Summary: " << g_sm_tests_passed << "/" << g_sm_tests_run << " passed";

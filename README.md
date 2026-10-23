@@ -58,14 +58,14 @@ The system pairs:
 flowchart TD
     subgraph Controller ["M5StickS3 Controller"]
         UI["Dual-Buffered M5Canvas UI<br/>(35 FPS Display Engine)"]
-        IMU["BMI270 6-Axis IMU<br/>(EMA Filtered Tilt & Gesture)"]
-        BTN["Physical Buttons<br/>(BtnA Spark/Hold, BtnB Cycle)"]
+        IMU["BMI270 6-Axis IMU<br/>(EMA Filtered Subtle Visual Tilt)"]
+        BTN["Physical Buttons<br/>(BtnA Spark/Hold, BtnB Cycle Cracker)"]
         CSM["Controller State Machine<br/>(Retries, ACK matching, Health)"]
         CRADIO["Controller Radio Dispatcher<br/>(ESP-NOW Broadcast / Unicast)"]
         
         BTN --> CSM
         IMU --> CSM
-        IMU -. Virtual Flick .-> UI
+        IMU -. Subtle Tilt & Sparkles .-> UI
         CSM --> UI
         CSM --> CRADIO
     end
@@ -229,10 +229,10 @@ The Phuljhari wireless protocol is defined in [`shared/phuljhari_protocol.h`](fi
 
 * **Front Button (Btn A):**
   * **Short Tap (< 300 ms):** Transmits an `EFFECT_CMD` for the currently selected character with bounded retries.
-  * **Long Press & Hold:** Engages live button synchronization, keeping the receiver's dedicated status LED continuously ON while held.
-* **Side Button (Btn B):** Cycles selected character and effect (*Phuljhari* &rarr; *Anar* &rarr; *Patakha*).
-* **IMU Wrist Tilt (Roll > 0.55 G):** Tilting the controller left or right switches characters fluidly without pressing buttons.
-* **IMU Wrist Flick (> 1.35 G):** Triggers an on-screen particle simulator burst. Virtual simulator effects are fully decoupled from wireless radio transmissions for safe gesture exploration.
+  * **Long Press & Hold:** Engages live button synchronization, keeping the receiver's dedicated status LED (GPIO 2) continuously ON while held, and turning OFF immediately on release or 600 ms failsafe timeout.
+* **Side Button (Btn B):** Exclusively cycles the selected cracker character and decorative effect (*Phuljhari* &rarr; *Anar* &rarr; *Patakha*).
+* **IMU Subtle Tilt (BMI270):** Slightly tilting the M5StickS3 smoothly tilts the selected cracker and naturally curves sparkle and fountain particle trajectories. Returning the device to a level position smoothly restores neutral vertical orientation. Tilting does **NOT** cycle characters or send radio commands.
+* **IMU Virtual Flick (> 1.35 G):** Triggers an on-screen particle simulator burst without changing cracker selection or transmitting effect commands.
 
 ---
 
@@ -300,18 +300,20 @@ Before deploying the hardware into a decorative enclosure, perform this bench-te
   - [ ] Confirm no external pull-ups exist on GPIO 2.
 - [ ] **Step 2: Receiver Zero-Hardware Bench Test**
   - [ ] Flash `receiver_esp32dev` without strip attached.
-  - [ ] Observe onboard LED: slow rhythmic blink (60 ms ON every 2s) confirms `SAFE_IDLE`.
+  - [ ] Observe onboard LED: stays strictly OFF at boot and during idle (no automatic blinking or heartbeat).
 - [ ] **Step 3: Controller Standalone Verification**
   - [ ] Flash `controller_m5sticks3`.
   - [ ] Verify startup splash animation loads cleanly.
-  - [ ] Test Btn B character cycling: verifies Phuljhari, Anar, Patakha animations.
-  - [ ] Test IMU tilt character cycling (tilt left/right).
-  - [ ] Test IMU flick gesture: verify on-screen particle burst activates without transmitting radio commands.
+  - [ ] Test Btn B character cycling: verifies Phuljhari, Anar, Patakha animations cycle reliably.
+  - [ ] Test IMU subtle visual tilt: tilt left/right slightly and observe cracker tilting smoothly and sparkles curving in the tilt direction.
+  - [ ] Return device to level: verify cracker smoothly returns to neutral vertical orientation without changing selection.
+  - [ ] Test IMU flick gesture: verify on-screen particle burst activates without changing cracker selection or transmitting radio commands.
 - [ ] **Step 4: End-to-End Wireless Pair Verification**
   - [ ] Power both devices within 1 meter.
   - [ ] Observe controller link indicator: transitions from `RECON` to green `REC: OK`.
-  - [ ] Press Btn A: verify receiver onboard LED displays active effect rhythm and controller displays `ACK OK` toast.
-  - [ ] Press and hold Btn A: verify receiver onboard LED stays solidly ON for duration of hold and turns OFF immediately upon release.
+  - [ ] Tap **Btn A**: confirm controller displays `ACK OK` toast and receiver onboard LED remains OFF (only strip effect runs).
+  - [ ] Press and hold **Btn A**: confirm receiver onboard LED (GPIO 2) stays solidly ON for duration of hold and turns OFF immediately upon release.
+  - [ ] Hold Btn A and power off controller: verify receiver onboard LED auto-cuts off within 600 ms.
 - [ ] **Step 5: Full LED Strip Test (With External Power)**
   - [ ] Connect WS2812B strip to 5V external power supply with common ground to ESP32.
   - [ ] Trigger Phuljhari, Anar, and Patakha effects; observe color correctness and smooth fading.

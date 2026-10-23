@@ -83,8 +83,8 @@ void LedController::update(
     bool button_indicator_active,
     uint32_t current_time_ms
 ) {
-    // 1. Update Bench-test Onboard LED rhythm & live button status
-    update_onboard_led(state, effect, button_indicator_active, current_time_ms);
+    // 1. Update Bench-test Onboard LED (Strictly button-controlled)
+    update_onboard_led(button_indicator_active);
 
     // 2. Frame-rate limiter for WS2812B strip rendering (~50 FPS / 20 ms)
     if (current_time_ms - last_frame_ms_ < PHULJHARI_CONFIG_FRAME_INTERVAL_MS) {
@@ -258,48 +258,14 @@ void LedController::render_safe_idle() {
 }
 
 /* -------------------------------------------------------------------------
- * Bench-Test / Onboard LED Pulse Rhythm
+ * Bench-Test / Onboard LED (Strictly Button-Controlled)
  * ------------------------------------------------------------------------- */
-void LedController::update_onboard_led(
-    protocol::ReceiverState state,
-    protocol::EffectId effect,
-    bool button_indicator_active,
-    uint32_t current_time_ms
-) {
+void LedController::update_onboard_led(bool button_indicator_active) {
 #if PHULJHARI_ENABLE_ONBOARD_LED
-    bool led_on = false;
-
-    // 1. Live synchronized button hold takes immediate priority on separate status LED
-    if (button_indicator_active) {
-        led_on = true;
-    }
-    // 2. Active decorative effect pulse rhythms
-    else if (state == protocol::RECV_STATE_EFFECT_ACTIVE) {
-        switch (effect) {
-            case protocol::EFFECT_ID_PHULJHARI:
-                // Fast festive shimmer (toggles every 50ms)
-                led_on = ((current_time_ms / 50) % 2 == 0);
-                break;
-            case protocol::EFFECT_ID_ANAR:
-                // Ascending cadence (100ms pulse every 250ms)
-                led_on = ((current_time_ms % 250) < 100);
-                break;
-            case protocol::EFFECT_ID_PATAKHA:
-                // Staccato pop flash (triple rapid burst)
-                led_on = ((current_time_ms % 300) < 40) ||
-                         (((current_time_ms % 300) > 80) && ((current_time_ms % 300) < 120));
-                break;
-            default:
-                led_on = false;
-                break;
-        }
-    } else if (state == protocol::RECV_STATE_SAFE_IDLE) {
-        // Soft heartbeat in idle: 60ms pulse every 2000ms
-        led_on = ((current_time_ms % 2000) < 60);
-    } else {
-        // Inactive during cooldown and error states
-        led_on = false;
-    }
+    // GPIO 2 responds ONLY to valid Button A press, hold-sync, and release.
+    // Strip effects, idle heartbeats, startup activity, and radio packets
+    // must NEVER alter or control GPIO 2.
+    bool led_on = button_indicator_active;
 
     uint8_t pin_level = led_on
                             ? (PHULJHARI_CONFIG_ONBOARD_ACTIVE_HIGH ? HIGH : LOW)
@@ -307,9 +273,7 @@ void LedController::update_onboard_led(
 
     digitalWrite(PHULJHARI_CONFIG_ONBOARD_LED_PIN, pin_level);
 #else
-    (void)state;
-    (void)effect;
-    (void)current_time_ms;
+    (void)button_indicator_active;
 #endif
 }
 

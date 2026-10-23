@@ -9,6 +9,8 @@
 
 #include "phuljhari_safety.h"
 #include "phuljhari_protocol.h"
+#include "controller_config.h"
+#include "controller_imu_math.h"
 #include "controller_state_machine.h"
 
 using namespace phuljhari;
@@ -223,6 +225,99 @@ static bool test_ctrl_simulator_decoupling() {
 }
 
 /* -------------------------------------------------------------------------
+ * Test 6: IMU Tilt Controls Subtle Visual Rotation Only (Never Selection)
+ * ------------------------------------------------------------------------- */
+static bool test_ctrl_imu_tilt_visual_rotation_only() {
+    ControllerStateMachine csm;
+    csm.init(1000);
+
+    // Initial neutral state
+    CTRL_ASSERT(csm.get_selected_character() == EFFECT_ID_PHULJHARI, "Initial cracker is Phuljhari");
+
+    // 1. Dead zone verification: small tremor below 0.12G should yield exactly 0.0f
+    float tilt = 0.0f;
+    tilt = ImuTiltMath::update_smooth_tilt(0.08f, tilt);
+    CTRL_ASSERT(tilt == 0.0f, "Tremor below deadzone (0.08G) must yield 0.0f tilt");
+    float rad = ImuTiltMath::tilt_to_rotation_rad(tilt);
+    CTRL_ASSERT(rad == 0.0f, "Zero tilt yields zero rotation angle");
+
+    // 2. Deliberate tilt beyond deadzone: e.g. 0.45G
+    for (int i = 0; i < 15; ++i) {
+        tilt = ImuTiltMath::update_smooth_tilt(0.45f, tilt);
+    }
+    CTRL_ASSERT(tilt > 0.4f, "Deliberate tilt smooths toward positive target");
+    rad = ImuTiltMath::tilt_to_rotation_rad(tilt);
+    CTRL_ASSERT(rad > 0.1f && rad <= PHULJHARI_IMU_MAX_ROTATION_RAD, "Rotation angle within safe clamped limit");
+
+    // Pass tilt to CSM
+    csm.set_sim_tilt(tilt, rad);
+    CTRL_ASSERT(csm.get_sim_tilt_x() == tilt, "CSM tilt norm matches");
+    CTRL_ASSERT(csm.get_sim_tilt_y() == rad, "CSM tilt angle matches");
+
+    // CRITICAL: Cracker selection must NOT change!
+    CTRL_ASSERT(csm.get_selected_character() == EFFECT_ID_PHULJHARI, "Tilting MUST NOT change selected cracker!");
+
+    // CRITICAL: No radio commands must be queued!
+    CTRL_ASSERT(!csm.has_pending_action(), "Tilting MUST NOT queue any radio actions!");
+
+    // 3. Opposite tilt: -0.50G
+    for (int i = 0; i < 20; ++i) {
+        tilt = ImuTiltMath::update_smooth_tilt(-0.50f, tilt);
+    }
+    CTRL_ASSERT(tilt < -0.4f, "Smooth tilt toward negative target");
+    rad = ImuTiltMath::tilt_to_rotation_rad(tilt);
+    CTRL_ASSERT(rad < -0.1f && rad >= -PHULJHARI_IMU_MAX_ROTATION_RAD, "Clamped negative rotation");
+    csm.set_sim_tilt(tilt, rad);
+
+    // Cracker selection remains strictly unchanged
+    CTRL_ASSERT(csm.get_selected_character() == EFFECT_ID_PHULJHARI, "Opposite tilt does NOT change selected cracker!");
+    CTRL_ASSERT(!csm.has_pending_action(), "No radio command dispatched");
+
+    // 4. Return to neutral orientation: device returned to level (0.0G)
+    for (int i = 0; i < 30; ++i) {
+        tilt = ImuTiltMath::update_smooth_tilt(0.0f, tilt);
+    }
+    CTRL_ASSERT(tilt == 0.0f, "Returning device to level restores neutral orientation (0.0f)");
+    rad = ImuTiltMath::tilt_to_rotation_rad(tilt);
+    CTRL_ASSERT(rad == 0.0f, "Neutral angle restored to 0.0 rad");
+    csm.set_sim_tilt(tilt, rad);
+
+    return true;
+}
+
+/* -------------------------------------------------------------------------
+ * Test 7: Flick & Tilt Do Not Select Cracker or Transmit Effect Commands
+ * ------------------------------------------------------------------------- */
+static bool test_ctrl_flick_and_tilt_no_selection_or_transmit() {
+    ControllerStateMachine csm;
+    csm.init(1000);
+
+    // Start with Phuljhari
+    CTRL_ASSERT(csm.get_selected_character() == EFFECT_ID_PHULJHARI, "Start with Phuljhari");
+
+    // Simulate extreme motion (flick gesture of 1.8G)
+    csm.trigger_sim_virtual_burst(); // Only triggers on-screen particle visual burst
+    csm.set_sim_tilt(0.8f, 0.30f);
+
+    // Must NOT change cracker
+    CTRL_ASSERT(csm.get_selected_character() == EFFECT_ID_PHULJHARI, "Flick does NOT change cracker selection");
+
+    // Must NOT send effect command
+    CTRL_ASSERT(!csm.has_pending_action(), "Flick does NOT send any effect commands");
+    CTRL_ASSERT(csm.get_total_triggers() == 0, "Triggers remain 0");
+
+    // Independent Button B selection: explicitly cycle character
+    csm.cycle_character_forward();
+    CTRL_ASSERT(csm.get_selected_character() == EFFECT_ID_ANAR, "Button B advances to Anar");
+    csm.cycle_character_forward();
+    CTRL_ASSERT(csm.get_selected_character() == EFFECT_ID_PATAKHA, "Button B advances to Patakha");
+    csm.cycle_character_forward();
+    CTRL_ASSERT(csm.get_selected_character() == EFFECT_ID_PHULJHARI, "Button B wraps back to Phuljhari");
+
+    return true;
+}
+
+/* -------------------------------------------------------------------------
  * Main Controller SM Test Runner
  * ------------------------------------------------------------------------- */
 int main() {
@@ -235,6 +330,8 @@ int main() {
     RUN_CTRL_TEST(test_ctrl_bounded_retries);
     RUN_CTRL_TEST(test_ctrl_application_ack_matching);
     RUN_CTRL_TEST(test_ctrl_simulator_decoupling);
+    RUN_CTRL_TEST(test_ctrl_imu_tilt_visual_rotation_only);
+    RUN_CTRL_TEST(test_ctrl_flick_and_tilt_no_selection_or_transmit);
 
     std::cout << "====================================================\n";
     std::cout << "Controller SM Summary: " << g_ctrl_tests_passed << "/" << g_ctrl_tests_run << " passed";

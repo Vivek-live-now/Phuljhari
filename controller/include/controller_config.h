@@ -60,21 +60,24 @@
 #define PHULJHARI_BUTTON_SYNC_REFRESH_MS 180
 
 /* -------------------------------------------------------------------------
- * IMU & Virtual Simulator Gesture Settings
+ * IMU & Visual Tilt Settings (BMI270)
  * ------------------------------------------------------------------------- */
 /** Accelerometer low-pass filter factor (Exponential Moving Average). */
-#define PHULJHARI_IMU_EMA_ALPHA          0.25f
+#define PHULJHARI_IMU_EMA_ALPHA          0.20f
 
-/** Tilt dead zone (G-force threshold below which tilt is ignored). */
-#define PHULJHARI_IMU_DEADZONE_G         0.20f
+/** Tilt dead zone (G-force threshold below which tilt is treated as level neutral). */
+#define PHULJHARI_IMU_DEADZONE_G         0.12f
 
-/** Tilt threshold to trigger character carousel selection (G-force). */
-#define PHULJHARI_IMU_TILT_SELECT_G      0.55f
+/** G-force magnitude corresponding to maximum visual tilt excursion. */
+#define PHULJHARI_IMU_MAX_TILT_G         0.65f
 
-/** Shake / flick threshold to trigger virtual simulator sparkle burst (G-force). */
+/** Maximum visual rotation angle in radians (~20 degrees = 0.35 rad). */
+#define PHULJHARI_IMU_MAX_ROTATION_RAD   0.35f
+
+/** Shake / flick threshold for virtual simulator telemetry (G-force). */
 #define PHULJHARI_IMU_FLICK_THRESHOLD_G  1.35f
 
-/** Minimum cooldown between IMU gesture actions (milliseconds). */
+/** Minimum cooldown between virtual flick bursts (milliseconds). */
 #define PHULJHARI_IMU_GESTURE_COOLDOWN_MS 600
 
 #endif /* PHULJHARI_CONTROLLER_CONFIG_H */

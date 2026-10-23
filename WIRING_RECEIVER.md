@@ -9,17 +9,17 @@
 
 ## 🛠️ Testing Configurations
 
-### Option 1: Zero-Hardware Bench Testing (Onboard LED)
-If you do not have an external LED strip on your bench, you can immediately test the receiver using the ESP32's built-in indicator LED:
+### Option 1: Zero-Hardware Bench Testing (Strictly Button-Controlled Status LED)
+If you do not have an external LED strip on your bench, you can immediately test wireless live button synchronization using the ESP32's built-in indicator LED:
 
 * **Default Pin:** `GPIO 2` (configured via `PHULJHARI_CONFIG_ONBOARD_LED_PIN` in [`receiver/include/receiver_config.h`](file:///data/data/com.termux/files/home/phuljhari/receiver/include/receiver_config.h)).
 * **Active Logic Level:** Active HIGH (`PHULJHARI_CONFIG_ONBOARD_ACTIVE_HIGH = true`).
-* **Visual Status Rhythms:**
-  * **Safe Idle:** Soft single pulse (60 ms ON every 2,000 ms) indicates receiver is alive and awaiting commands.
-  * **✨ Phuljhari Effect:** Fast festive shimmer (toggles rapidly every 50 ms).
-  * **🎆 Anar Effect:** Ascending fountain cadence (100 ms pulse every 250 ms).
-  * **💥 Patakha Effect:** Triple staccato pop flashes.
-  * **Cooldown / Error:** LED is completely OFF (safe inactive default).
+* **Strict Button-Only Behavior:**
+  * **Idle & Startup:** LED is strictly OFF. No heartbeats, blinking, or startup flashes.
+  * **Button A Hold:** LED is illuminated ON while Button A is actively pressed and held on the M5StickS3 (`BUTTON_DOWN` and periodic `BUTTON_SYNC`).
+  * **Button A Release:** LED switches OFF immediately on `BUTTON_UP`.
+  * **Failsafe Cutoff:** If hold-sync packets stop arriving, a 600 ms failsafe timeout turns the LED OFF automatically.
+  * **Independent Isolation:** PING, PONG, effect commands, status queries, and WS2812B strip effects NEVER alter or control GPIO 2.
 
 > [!NOTE]  
 > If your specific dev board clone maps its onboard LED to a different pin (e.g. GPIO 4 or 16), or is active-low, update `PHULJHARI_CONFIG_ONBOARD_LED_PIN` and `PHULJHARI_CONFIG_ONBOARD_ACTIVE_HIGH` in `receiver_config.h`.

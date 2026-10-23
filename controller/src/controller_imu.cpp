@@ -14,11 +14,9 @@ ControllerImu::ControllerImu()
       filtered_ax_(0.0f),
       filtered_ay_(0.0f),
       filtered_az_(0.0f),
-      gyro_gx_(0.0f),
-      gyro_gy_(0.0f),
-      gyro_gz_(0.0f),
-      last_tilt_gesture_ms_(0),
-      last_flick_gesture_ms_(0) {}
+      filtered_tilt_norm_(0.0f),
+      tilt_angle_rad_(0.0f),
+      last_flick_telemetry_ms_(0) {}
 
 bool ControllerImu::begin() {
     Serial.println("[IMU] Initializing BMI270 6-Axis Motion Sensor...");
@@ -30,7 +28,7 @@ bool ControllerImu::begin() {
     }
 
     imu_available_ = true;
-    Serial.println("[IMU] BMI270 IMU ready with EMA filtering.");
+    Serial.println("[IMU] BMI270 IMU ready for subtle cracker visual tilt.");
     return true;
 }
 
@@ -50,35 +48,22 @@ void ControllerImu::update(ControllerStateMachine& csm, uint32_t current_time_ms
     filtered_ay_ = filtered_ay_ * (1.0f - PHULJHARI_IMU_EMA_ALPHA) + raw_ay * PHULJHARI_IMU_EMA_ALPHA;
     filtered_az_ = filtered_az_ * (1.0f - PHULJHARI_IMU_EMA_ALPHA) + raw_az * PHULJHARI_IMU_EMA_ALPHA;
 
-    gyro_gx_ = raw_gx;
-    gyro_gy_ = raw_gy;
-    gyro_gz_ = raw_gz;
+    // 3. Compute smooth visual tilt along display landscape orientation
+    // When holding M5StickS3 in landscape rotation 1, left/right tilt corresponds to filtered_ax_
+    filtered_tilt_norm_ = ImuTiltMath::update_smooth_tilt(filtered_ax_, filtered_tilt_norm_);
+    tilt_angle_rad_ = ImuTiltMath::tilt_to_rotation_rad(filtered_tilt_norm_);
 
-    // 3. Dead-zone filtering
-    float deadzoned_ax = (fabs(filtered_ax_) > PHULJHARI_IMU_DEADZONE_G) ? filtered_ax_ : 0.0f;
-    float deadzoned_ay = (fabs(filtered_ay_) > PHULJHARI_IMU_DEADZONE_G) ? filtered_ay_ : 0.0f;
+    // 4. Update visual tilt state in ControllerStateMachine
+    // Strictly controls visual rotation and sparkle direction.
+    // DOES NOT change selected cracker or send effect commands!
+    csm.set_sim_tilt(filtered_tilt_norm_, tilt_angle_rad_);
 
-    // 4. Update virtual simulator tilt parameters (strictly separated from radio commands)
-    csm.set_sim_tilt(deadzoned_ax, deadzoned_ay);
-
-    // 5. Deliberate Gesture Detection
-    // Gesture A: Deliberate wrist tilt left / right -> cycle character theme
-    if (current_time_ms - last_tilt_gesture_ms_ >= PHULJHARI_IMU_GESTURE_COOLDOWN_MS) {
-        if (filtered_ax_ > PHULJHARI_IMU_TILT_SELECT_G) {
-            csm.cycle_character_forward();
-            last_tilt_gesture_ms_ = current_time_ms;
-        } else if (filtered_ax_ < -PHULJHARI_IMU_TILT_SELECT_G) {
-            csm.cycle_character_backward();
-            last_tilt_gesture_ms_ = current_time_ms;
-        }
-    }
-
-    // Gesture B: Deliberate flick / shake -> trigger virtual simulator burst
+    // 5. Deliberate flick/shake triggers on-screen simulator telemetry only (never changes selection or transmits)
     float total_g = sqrt(raw_ax * raw_ax + raw_ay * raw_ay + raw_az * raw_az);
     if (total_g > PHULJHARI_IMU_FLICK_THRESHOLD_G) {
-        if (current_time_ms - last_flick_gesture_ms_ >= PHULJHARI_IMU_GESTURE_COOLDOWN_MS) {
+        if (current_time_ms - last_flick_telemetry_ms_ >= PHULJHARI_IMU_GESTURE_COOLDOWN_MS) {
             csm.trigger_sim_virtual_burst();
-            last_flick_gesture_ms_ = current_time_ms;
+            last_flick_telemetry_ms_ = current_time_ms;
         }
     }
 }

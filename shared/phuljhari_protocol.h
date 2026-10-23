@@ -610,6 +610,26 @@ static inline StatusCode deserialize_effect_stop(
 }
 
 /**
+ * @brief Serializes MSG_TYPE_STATUS_REQ.
+ */
+static inline StatusCode serialize_status_req(
+    uint16_t seq,
+    uint8_t* out_buf,
+    size_t out_buf_capacity,
+    size_t* out_frame_len
+) {
+    return serialize_frame(
+        MSG_TYPE_STATUS_REQ,
+        seq,
+        NULL,
+        0,
+        out_buf,
+        out_buf_capacity,
+        out_frame_len
+    );
+}
+
+/**
  * @brief Serializes MSG_TYPE_STATUS_RESP.
  */
 static inline StatusCode serialize_status_resp(

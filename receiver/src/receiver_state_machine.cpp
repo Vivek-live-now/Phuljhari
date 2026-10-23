@@ -351,7 +351,9 @@ protocol::StatusCode ReceiverStateMachine::handle_button_event(
             button_hold_indicator_active_ = true;
             button_hold_last_rx_ms_ = current_time_ms;
             last_button_seq_ = seq;
+            return protocol::STATUS_OK;
         }
+        return protocol::STATUS_ERR_DUPLICATE;
     } else if (type == protocol::MSG_TYPE_BUTTON_SYNC) {
         // Stale / orphaned sync protection:
         // A periodic sync packet CANNOT reactivate an expired or released hold!
@@ -362,13 +364,17 @@ protocol::StatusCode ReceiverStateMachine::handle_button_event(
         if (diff > 0) {
             button_hold_last_rx_ms_ = current_time_ms;
             last_button_seq_ = seq;
+            return protocol::STATUS_OK;
         }
+        return protocol::STATUS_ERR_DUPLICATE;
     } else if (type == protocol::MSG_TYPE_BUTTON_UP) {
         int16_t diff = (int16_t)(seq - last_button_seq_);
         if (diff >= 0 || last_button_seq_ == 0) {
             button_hold_indicator_active_ = false;
             last_button_seq_ = seq;
+            return protocol::STATUS_OK;
         }
+        return protocol::STATUS_ERR_DUPLICATE;
     }
     return protocol::STATUS_OK;
 }

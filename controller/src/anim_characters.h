@@ -38,16 +38,16 @@ public:
     void render_character(
         M5Canvas& canvas,
         protocol::EffectId effect,
-        float tilt_x,
-        float tilt_y,
+        float tilt_norm,
+        float tilt_angle_rad,
         bool trigger_virtual_burst,
         uint32_t current_time_ms
     );
 
 private:
-    void render_phuljhari(M5Canvas& canvas, int cx, int cy, float tilt_x, uint32_t current_time_ms);
-    void render_anar(M5Canvas& canvas, int cx, int cy, float tilt_x, uint32_t current_time_ms);
-    void render_patakha(M5Canvas& canvas, int cx, int cy, float tilt_x, uint32_t current_time_ms);
+    void render_phuljhari(M5Canvas& canvas, int cx, int cy, float tilt_norm, float tilt_angle_rad, uint32_t current_time_ms);
+    void render_anar(M5Canvas& canvas, int cx, int cy, float tilt_norm, float tilt_angle_rad, uint32_t current_time_ms);
+    void render_patakha(M5Canvas& canvas, int cx, int cy, float tilt_norm, float tilt_angle_rad, uint32_t current_time_ms);
 
     /* Particles for Phuljhari sparkles */
     struct SparkleParticle {
